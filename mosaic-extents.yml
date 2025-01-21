@@ -1,0 +1,33 @@
+id: mosaic-extents
+version: 0.0.1
+title: Mosaic Extents
+description: Mosaics overlapping flood extent raster observations into a single combined raster
+keywords:
+  - mosaic
+  - flood
+  - raster
+  - extent
+jobControlOptions:
+  - sync-execute
+  - async-execute
+outputTransmission:
+  - reference
+inputs:
+  branchTiffs:
+    title: Branch Raster Files
+    description: Array of references to GeoTIFF files containing flood extent observations from different branches
+    schema:
+      type: array
+      items:
+        type: string
+        format: uri
+        contentMediaType: image/tiff; application=geotiff
+      minItems: 1
+outputs:
+  mosaickedTiff:
+    title: Mosaicked Extent
+    description: Reference to the output GeoTIFF file containing the combined mosaicked flood extent
+    schema:
+      type: string
+      format: uri
+      contentMediaType: image/tiff; application=geotiff

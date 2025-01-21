@@ -1,0 +1,34 @@
+id: calculate-agreement-metrics
+version: 0.0.1
+title: Calculate Agreement Metrics
+description: Computes validation metrics like critical success index from an agreement map comparing two rasters
+keywords:
+  - metrics
+  - validation
+  - agreement
+  - statistics
+jobControlOptions:
+  - sync-execute
+  - async-execute
+outputTransmission:
+  - value
+  - reference
+inputs:
+  agreementMap:
+    title: Agreement Map
+    description: Reference to a GeoTIFF containing an agreement map showing where two rasters agree/disagree
+    schema:
+      type: string
+      format: uri
+      contentMediaType: image/tiff; application=geotiff
+outputs:
+  metrics:
+    title: Validation Metrics
+    description: Object containing various computed metrics analyzing the agreement between the compared rasters
+    schema:
+      type: object
+      additionalProperties:
+        oneOf:
+          - type: string
+          - type: integer
+          - type: number

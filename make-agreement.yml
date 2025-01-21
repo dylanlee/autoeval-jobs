@@ -1,0 +1,37 @@
+id: make-agreement
+version: 0.0.1
+title: Create Agreement Map
+description: Creates an agreement map raster comparing two input rasters to show where their pixel values agree and disagree
+keywords:
+  - agreement
+  - comparison
+  - raster
+  - validation
+jobControlOptions:
+  - sync-execute
+  - async-execute
+outputTransmission:
+  - reference
+inputs:
+  raster1:
+    title: First Raster
+    description: Reference to the first raster to be compared
+    schema:
+      type: string
+      format: uri
+      contentMediaType: image/tiff; application=geotiff
+  raster2:
+    title: Second Raster
+    description: Reference to the second raster to be compared
+    schema:
+      type: string
+      format: uri
+      contentMediaType: image/tiff; application=geotiff
+outputs:
+  agreementMap:
+    title: Agreement Map
+    description: Reference to the output raster showing where the input rasters agree/disagree
+    schema:
+      type: string
+      format: uri
+      contentMediaType: image/tiff; application=geotiff

@@ -1,0 +1,58 @@
+id: inundate-branch
+title: Branch Inundation Process
+version: "0.0.1"
+description: Generates flood extents for a specified hydroID catchment using HAND (Height Above Nearest Drainage) methodology
+jobControlOptions:
+  - async-execute
+  - sync-execute
+outputTransmission:
+  - reference
+inputs:
+  hand_dem:
+    title: HAND REM
+    description: HAND (Height Above Nearest Drainage) relative elevation map of the branch
+    schema:
+      type: string
+      format: uri
+      contentMediaType: image/tiff
+      
+  catchment:
+    title: Catchment Raster
+    description: Raster of the catchment where pixel values correspond to catchment ID
+    schema:
+      type: string
+      format: uri
+      contentMediaType: image/tiff
+
+  cross_walked_catchment:
+    title: Catchment Geometry
+    description: Geopackage containing catchment geometry and properties
+    schema:
+      type: string
+      format: uri
+      contentMediaType: application/geopackage+sqlite3
+
+  hydrotable:
+    title: Hydraulic Properties Table
+    description: CSV file containing hydraulic properties of the channel in the catchment
+    schema:
+      type: string
+      format: uri
+      contentMediaType: text/csv
+
+  flowfile:
+    title: Flow Information
+    description: CSV file containing flow information for the branch
+    schema:
+      type: string
+      format: uri
+      contentMediaType: text/csv
+
+outputs:
+  branch_extent:
+    title: Branch Extent Raster
+    description: Raster showing the branch extent
+    schema:
+      type: string
+      format: uri
+      contentMediaType: image/tiff
