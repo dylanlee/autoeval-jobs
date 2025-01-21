@@ -1,21 +1,22 @@
 id: mosaic-extents
 version: 0.0.1
 title: Mosaic Extents
-description: Mosaics overlapping flood extent raster observations into a single combined raster
+description: Mosaics and homogenizes overlapping flood raster observations into a single combined raster, with optional clipping and reprojection
 keywords:
   - mosaic
   - flood
   - raster
   - extent
+  - homogenize
 jobControlOptions:
   - sync-execute
   - async-execute
 outputTransmission:
   - reference
 inputs:
-  branchTiffs:
-    title: Branch Raster Files
-    description: Array of references to GeoTIFF files containing flood extent observations from different branches
+  floodTiffs:
+    title: Raster Files
+    description: Array of references to GeoTIFF files containing flood observations from different branches
     schema:
       type: array
       items:
@@ -23,10 +24,44 @@ inputs:
         format: uri
         contentMediaType: image/tiff; application=geotiff
       minItems: 1
+  clipGeometry:
+    title: Clipping Geometry
+    description: Optional GeoJSON geometry used to clip the final mosaicked raster
+    schema:
+      oneOf:
+        - allOf:
+            - format: geojson-geometry
+            - $ref: http://schemas.opengis.net/ogcapi/features/part1/1.0/openapi/schemas/geometryGeoJSON.yaml
+    minOccurs: 0
+  targetCRS:
+    title: Target Coordinate Reference System
+    description: Target coordinate reference system for the output raster as an EPSG code (e.g. EPSG:4326)
+    schema:
+      type: string
+      pattern: ^EPSG:[0-9]+$
+  targetResolution:
+    title: Target Resolution
+    description: Target resolution in units of the target CRS
+    schema:
+      type: object
+      required:
+        - x
+        - y
+      properties:
+        x:
+          type: number
+          description: Resolution in the x direction
+          minimum: 0
+          exclusiveMinimum: true
+        y:
+          type: number
+          description: Resolution in the y direction
+          minimum: 0
+          exclusiveMinimum: true
 outputs:
-  mosaickedTiff:
-    title: Mosaicked Extent
-    description: Reference to the output GeoTIFF file containing the combined mosaicked flood extent
+  mosaickedFloodTiff:
+    title: Mosaicked Flood Raster
+    description: Reference to the output GeoTIFF file containing the combined mosaicked flood rasters
     schema:
       type: string
       format: uri
