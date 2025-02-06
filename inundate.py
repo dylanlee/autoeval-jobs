@@ -1,145 +1,114 @@
 #!/usr/bin/env python3
+import os
+import json
+import argparse
+from smart_open import open
 import numpy as np
 import pandas as pd
+import pdb
 import rasterio
 from rasterio.windows import Window
 import boto3
-from smart_open import open
-import json
-import os
-import argparse
-import pdb
-
-
-def simple_inundate_catchment_data(
-    catchment_data: dict,
-    forecast_path: str,
-    output_path: str,
-    window_size: int = 1024,
-) -> None:
-    """Process inundation with windowed S3 access and S3 forecast loading."""
-    # Configure AWS session
-    session = boto3.Session()
-
-    # Load forecast from S3
-    with open(forecast_path, "r", transport_params={"session": session}) as f:
-        forecast = pd.read_csv(
-            f,
-            names=["feature_id", *pd.read_csv(f, nrows=0).columns[1:]],
-            dtype={"feature_id": int, "discharge": float},
-        )
-
-    # Load and process hydrology data with lake filtering
-    hydro_table = pd.DataFrame(
-        [
-            {
-                "HydroID": hydro_id,
-                "feature_id": curve["nwm_feature_id"],
-                "stage": stage,
-                "discharge_cms": q,
-                "lake_id": curve["lake_id"],
-            }
-            for hydro_id, curve in catchment_data["hydrotable_entries"].items()
-            for stage, q in zip(curve["stage"], curve["discharge_cms"])
-            if curve["lake_id"] == -999
-        ]
-    )
-    # Merge with forecast and interpolate
-    merged = hydro_table.merge(forecast, on="feature_id", how="inner")
-    interpolated = (
-        merged.groupby("HydroID")
-        .apply(
-            lambda g: np.interp(g["discharge"].iloc[0], g["discharge_cms"], g["stage"])
-        )
-        .to_dict()
-    )
-
-    # Prepare raster processing
-    rem_path = catchment_data["raster_pair"]["rem_raster_path"]
-    catchment_path = catchment_data["raster_pair"]["catchment_raster_path"]
-
-    # Download rasters from S3 if needed
-    if rem_path.startswith("s3://"):
-        local_rem = "/tmp/rem.tif"
-        s3 = session.client("s3")
-        bucket, key = rem_path[5:].split("/", 1)
-        s3.download_file(bucket, key, local_rem)
-        rem_path = local_rem
-
-    if catchment_path.startswith("s3://"):
-        local_catch = "/tmp/catch.tif"
-        bucket, key = catchment_path[5:].split("/", 1)
-        s3.download_file(bucket, key, local_catch)
-        catchment_path = local_catch
-
-    with rasterio.open(rem_path) as rem, rasterio.open(catchment_path) as catchments:
-        if rem.shape != catchments.shape:
-            raise ValueError("Raster dimensions mismatch")
-
-        # Create temporary local output
-        local_output = "/tmp/output.tif"
-        profile = rem.profile.copy()
-        profile.update(dtype="uint8", count=1, compress="lzw", nodata=255)
-
-        with rasterio.open(local_output, "w", **profile) as dst:
-            # Process data in windows
-            for j in range(0, rem.height, window_size):
-                for i in range(0, rem.width, window_size):
-                    # Adjust window size for edge cases
-                    effective_width = min(window_size, rem.width - i)
-                    effective_height = min(window_size, rem.height - j)
-                    window = Window(i, j, effective_width, effective_height)
-
-                    rem_data = rem.read(1, window=window)
-                    catch_data = catchments.read(1, window=window).astype(str)
-
-                    valid_mask = rem_data >= 0
-                    stages = np.vectorize(lambda x: interpolated.get(x, -9999))(
-                        catch_data
-                    )
-                    window_result = np.where(
-                        valid_mask & (stages > rem_data), 1, 0
-                    ).astype(np.uint8)
-
-                    dst.write(window_result, window=window, indexes=1)
-
-        # Upload result to S3
-        if output_path.startswith("s3://"):
-            bucket, key = output_path[5:].split("/", 1)
-            s3.upload_file(local_output, bucket, key)
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Process inundation data")
-    parser.add_argument(
-        "--catchment-data", required=True, help="S3 path to catchment data JSON"
+    # Parse arguments
+    parser = argparse.ArgumentParser(
+        description="Inundation mapping from NWM forecasts"
     )
     parser.add_argument(
-        "--forecast-path", required=True, help="Path to forecast CSV file or S3 URI"
+        "--catchment-data", required=True, help="S3 path to catchment JSON"
     )
     parser.add_argument(
-        "--output-path", required=True, help="Output path for resulting raster (S3 URI)"
+        "--forecast-path", required=True, help="S3 path to forecast CSV"
+    )
+    parser.add_argument(
+        "--output-path", required=True, help="Output path for inundation raster"
     )
     parser.add_argument(
         "--window-size", type=int, default=1024, help="Processing window size"
     )
-
     args = parser.parse_args()
 
-    # Configure AWS session
+    # Configure AWS credentials for raster access
     session = boto3.Session()
-
-    # Read the catchment data from S3
-    with open(args.catchment_data, "r", transport_params={"session": session}) as f:
-        catchment_data = json.load(f)
-
-    # Process inundation
-    simple_inundate_catchment_data(
-        catchment_data=catchment_data,
-        forecast_path=args.forecast_path,
-        output_path=args.output_path,
-        window_size=args.window_size,
+    creds = session.get_credentials()
+    os.environ.update(
+        {
+            "AWS_ACCESS_KEY_ID": creds.access_key,
+            "AWS_SECRET_ACCESS_KEY": creds.secret_key,
+            **({"AWS_SESSION_TOKEN": creds.token} if creds.token else {}),
+        }
     )
+
+    # Load data
+    with open(args.catchment_data) as f:
+        catchment = json.load(f)
+
+    with open(args.forecast_path, "r", transport_params={"session": session}) as f:
+        forecast = pd.read_csv(
+            f,
+            header=0,
+            names=["feature_id", "discharge"],
+            dtype={"feature_id": int, "discharge": float},
+        )
+    # Create stage mapping with proper group handling
+    hydro_df = pd.DataFrame(catchment["hydrotable_entries"]).T.reset_index(
+        names="HydroID"
+    )
+    hydro_df = hydro_df[hydro_df.lake_id == -999].explode(["stage", "discharge_cms"])
+    hydro_df = hydro_df.astype(
+        {
+            "HydroID": "int32",
+            "stage": "float32",
+            "discharge_cms": "float32",
+            "nwm_feature_id": "int32",
+        }
+    )
+
+    merged = hydro_df.merge(forecast, left_on="nwm_feature_id", right_on="feature_id")
+    if merged.empty:
+        raise ValueError("No matching forecast data for catchment features")
+
+    stage_map = (
+        merged.groupby("HydroID", group_keys=False)
+        .apply(lambda g: np.interp(g.discharge.iloc[0], g.discharge_cms, g.stage))
+        .to_dict()
+    )
+
+    # Raster processing with corrected window math
+    with rasterio.open(
+        catchment["raster_pair"]["rem_raster_path"]
+    ) as rem, rasterio.open(catchment["raster_pair"]["catchment_raster_path"]) as cat:
+
+        profile = rem.profile
+        profile.update(dtype="uint8", count=1, nodata=255, compress="lzw")
+
+        with rasterio.open("/tmp/temp.tif", "w", **profile) as dst:
+            for y in range(0, rem.height, args.window_size):
+                h = min(args.window_size, rem.height - y)
+                for x in range(0, rem.width, args.window_size):
+                    w = min(args.window_size, rem.width - x)
+                    window = Window(x, y, w, h)
+
+                    rem_win = rem.read(1, window=window)
+                    cat_win = cat.read(1, window=window).astype("int32")
+
+                    valid_mask = rem_win >= 0
+                    stages = np.vectorize(lambda x: stage_map.get(x, -9999))(cat_win)
+                    inundation = (
+                        (stages > rem_win) & valid_mask & (stages != -9999)
+                    ).astype("uint8")
+
+                    dst.write(inundation, 1, window=window)
+
+    # Correct S3 path parsing using string slicing
+    if args.output_path.startswith("s3://"):
+        s3_path = args.output_path[5:]
+        bucket, _, key = s3_path.partition("/")
+        boto3.client("s3").upload_file("/tmp/temp.tif", bucket, key)
+    else:
+        os.replace("/tmp/temp.tif", args.output_path)
 
 
 if __name__ == "__main__":
