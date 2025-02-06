@@ -45,13 +45,14 @@ def main():
     with open(args.catchment_data) as f:
         catchment = json.load(f)
 
-    with open(args.forecast_path, "r", transport_params={"session": session}) as f:
+    with open(args.forecast_path, "r") as f:
         forecast = pd.read_csv(
             f,
             header=0,
             names=["feature_id", "discharge"],
             dtype={"feature_id": int, "discharge": float},
         )
+
     # Create stage mapping with proper group handling
     hydro_df = pd.DataFrame(catchment["hydrotable_entries"]).T.reset_index(
         names="HydroID"
@@ -66,15 +67,21 @@ def main():
         }
     )
 
-    merged = hydro_df.merge(forecast, left_on="nwm_feature_id", right_on="feature_id")
-    if merged.empty:
-        raise ValueError("No matching forecast data for catchment features")
+    # Create merged DataFrame
+    merged = hydro_df.merge(
+        forecast, left_on="nwm_feature_id", right_on="feature_id", how="inner"
+    )
+
+    merged.set_index("HydroID", inplace=True)
 
     stage_map = (
-        merged.groupby("HydroID", group_keys=False)
+        merged.groupby(level=0, group_keys=False)
         .apply(lambda g: np.interp(g.discharge.iloc[0], g.discharge_cms, g.stage))
         .to_dict()
     )
+
+    if merged.empty:
+        raise ValueError("No matching forecast data for catchment features")
 
     # Raster processing with corrected window math
     with rasterio.open(
