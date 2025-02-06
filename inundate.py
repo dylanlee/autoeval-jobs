@@ -12,7 +12,6 @@ import boto3
 
 
 def main():
-    # Parse arguments
     parser = argparse.ArgumentParser(
         description="Inundation mapping from NWM forecasts"
     )
@@ -83,7 +82,7 @@ def main():
     if merged.empty:
         raise ValueError("No matching forecast data for catchment features")
 
-    # Raster processing with corrected window math
+    # Windowed raster processing
     with rasterio.open(
         catchment["raster_pair"]["rem_raster_path"]
     ) as rem, rasterio.open(catchment["raster_pair"]["catchment_raster_path"]) as cat:
@@ -109,7 +108,7 @@ def main():
 
                     dst.write(inundation, 1, window=window)
 
-    # Correct S3 path parsing using string slicing
+    # output path parsing
     if args.output_path.startswith("s3://"):
         s3_path = args.output_path[5:]
         bucket, _, key = s3_path.partition("/")
