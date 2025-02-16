@@ -1,1 +1,51 @@
-# I want this yml to have a job name, description, job arguments, and job input and outputs. The job inputs and outputs should be specified as json schema and should each have their own accompanying information similar to the other .yml files in this directory. The argements are: 1. a version string called hand_ver, 2. a benchmark data source called bench_src, 3. an optional date range. The input is a multipolygon gpkg. There are no outputs. AI!
+id: coordinator
+version: 0.0.1
+title: Processing Coordinator
+description: Coordinates HAND data processing with benchmark comparison
+keywords:
+  - coordination
+  - processing
+  - validation
+jobControlOptions:
+  - sync-execute
+  - async-execute
+outputTransmission:
+  - reference
+arguments:
+  hand_ver:
+    title: HAND Version
+    description: Version identifier for HAND dataset
+    schema:
+      type: string
+  bench_src:
+    title: Benchmark Source
+    description: Data source identifier for benchmark dataset
+    schema:
+      type: string
+  date_range:
+    title: Date Range
+    description: Optional temporal filter for analysis
+    required: false
+    schema:
+      type: object
+      properties:
+        start_date:
+          type: string
+          format: date
+        end_date:
+          type: string
+          format: date
+inputs:
+  area_of_interest:
+    title: Analysis Area
+    description: Multipolygon geometry defining analysis boundaries
+    schema:
+      type: object
+      properties:
+        file_path:
+          type: string
+          format: gpkg
+        feature_type:
+          type: string
+          const: multipolygon
+      required: [file_path]
