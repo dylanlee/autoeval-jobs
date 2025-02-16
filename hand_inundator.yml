@@ -43,7 +43,7 @@ inputs:
 outputs:
   inundation_raster:
     title: Inundation Map
-    description: Binary flood extent raster (1=inundated, 0=non-inundated) with 255 as no data
+    description: Binary flood extent raster (1=inundated, 0=non-inundated) in CONUS Albers (EPSG:5070)
     schema:
       type: string
       format: uri
@@ -52,3 +52,6 @@ outputs:
       compression: lzw
       dtype: uint8
       no 255
+      crs: 
+        const: EPSG:5070
+        description: Albers Equal Area Continental US projection

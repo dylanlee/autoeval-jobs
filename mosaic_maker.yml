@@ -62,6 +62,11 @@ outputs:
         - type: string
           format: uri
           contentMediaType: image/tiff; application=geotiff
+          parameters:
+            crs: 
+              const: EPSG:5070
+              description: Standard US analysis projection with equal area preservation
+            units: meters
         - type: string
           format: uri
           contentMediaType: application/geopackage+gpkg
