@@ -1,16 +1,5 @@
 id: mosaic-extents
-version: 0.0.1
-title: Mosaic Extents
 description: Mosaics and homogenizes overlapping flood raster observations into a single combined raster, with optional clipping and reprojection
-keywords:
-  - mosaic
-  - flood
-  - raster
-  - extent
-  - homogenize
-jobControlOptions:
-  - sync-execute
-  - async-execute
 outputTransmission:
   - reference
 inputs:
