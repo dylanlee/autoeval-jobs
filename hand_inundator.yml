@@ -14,7 +14,7 @@ arguments:
 inputs:
   catchment:
     title: Catchment Metadata
-    description: JSON file containing catchment properties and hydrotable
+    description: JSON file containing catchment properties and rating curve for each hydro-id in catchment
     schema:
       type: string
       format: uri

@@ -1,15 +1,5 @@
 id: make-agreement
-version: 0.0.1
-title: Create Agreement Map
 description: Creates an agreement map raster comparing two input rasters to show where their pixel values agree and disagree
-keywords:
-  - agreement
-  - comparison
-  - raster
-  - validation
-jobControlOptions:
-  - sync-execute
-  - async-execute
 outputTransmission:
   - reference
 inputs:
