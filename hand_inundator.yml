@@ -51,7 +51,7 @@ outputs:
     parameters:
       compression: lzw
       dtype: uint8
-      no 255
+      nodata: 255
       crs: 
         const: EPSG:5070
         description: Albers Equal Area Continental US projection
