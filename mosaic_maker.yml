@@ -47,12 +47,6 @@ inputs:
           - format: geojson-geometry
           - $ref: http://schemas.opengis.net/ogcapi/features/part1/1.0/openapi/schemas/geometryGeoJSON.yaml
     minOccurs: 0
-  targetCRS:
-    title: Target CRS
-    description: Coordinate reference system for output as EPSG code (e.g. EPSG:4326)
-    schema:
-      type: string
-      pattern: ^EPSG:[0-9]+$
 outputs:
   mosaickedResult:
     title: Combined Dataset
