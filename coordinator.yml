@@ -29,17 +29,10 @@ arguments:
           type: string
           format: date
 inputs:
-# this will be fed directly as a filepath to the job so how do we edit the description to reflect that ai!
   area_of_interest:
     title: Analysis Area
-    description: Multipolygon geometry defining analysis boundaries
+    description: URI reference to a GeoPackage file containing multipolygon geometry for analysis
     schema:
-      type: object
-      properties:
-        file_path:
-          type: string
-          format: gpkg
-        feature_type:
-          type: string
-          const: multipolygon
-      required: [file_path]
+      type: string
+      format: uri
+      contentMediaType: application/geopackage+gpkg
