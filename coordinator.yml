@@ -1,5 +1,4 @@
 id: coordinator
-version: 0.0.1
 title: Processing Coordinator
 description: Coordinates batch jobs performing HAND data evaluation against benchmark data
 outputTransmission:
