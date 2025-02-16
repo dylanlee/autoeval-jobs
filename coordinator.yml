@@ -15,10 +15,10 @@ arguments:
       type: string
   date_range:
     title: Date Range
-    description: Optional temporal filter for analysis
-    required: false
+    description: Temporal filter for analysis
     schema:
-      type: object
+      type: [object, "null"]
+      default: null
       properties:
         start_date:
           type: string
