@@ -1,14 +1,7 @@
 id: coordinator
 version: 0.0.1
 title: Processing Coordinator
-description: Coordinates HAND data processing with benchmark comparison
-keywords:
-  - coordination
-  - processing
-  - validation
-jobControlOptions:
-  - sync-execute
-  - async-execute
+description: Coordinates batch jobs performing HAND data evaluation against benchmark data
 outputTransmission:
   - reference
 arguments:
