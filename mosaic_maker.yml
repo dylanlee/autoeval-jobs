@@ -40,13 +40,12 @@ inputs:
       minItems: 1
   clipGeometry:
     title: Clipping Geometry
-    description: Optional GeoJSON polygon for clipping output
+    description: GeoJSON polygon defining clipping boundaries for output
     schema:
       oneOf:
         - allOf:
           - format: geojson-geometry
           - $ref: http://schemas.opengis.net/ogcapi/features/part1/1.0/openapi/schemas/geometryGeoJSON.yaml
-    minOccurs: 0
 outputs:
   mosaickedResult:
     title: Combined Dataset
