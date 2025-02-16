@@ -1,57 +1,69 @@
 id: mosaic-extents
-description: Mosaics and homogenizes overlapping flood raster observations into a single combined raster, with optional clipping and reprojection
+description: Mosaics and homogenizes overlapping flood observations (raster or vector) into a combined dataset with optional clipping/reprojection
 outputTransmission:
   - reference
-inputs:
-  floodTiffs:
-    title: Raster Files
-    description: Array of references to GeoTIFF files containing flood observations from different branches
-    schema:
-      type: array
-      items:
-        type: string
-        format: uri
-        contentMediaType: image/tiff; application=geotiff
-      minItems: 1
-  clipGeometry:
-    title: Clipping Geometry
-    description: Optional GeoJSON geometry used to clip the final mosaicked raster
-    schema:
-      oneOf:
-        - allOf:
-            - format: geojson-geometry
-            - $ref: http://schemas.opengis.net/ogcapi/features/part1/1.0/openapi/schemas/geometryGeoJSON.yaml
-    minOccurs: 0
-  targetCRS:
-    title: Target Coordinate Reference System
-    description: Target coordinate reference system for the output raster as an EPSG code (e.g. EPSG:4326)
-    schema:
-      type: string
-      pattern: ^EPSG:[0-9]+$
+arguments:
   targetResolution:
     title: Target Resolution
-    description: Target resolution in units of the target CRS
+    description: Resolution in CRS units (required for raster outputs)
     schema:
       type: object
-      required:
-        - x
-        - y
       properties:
         x:
           type: number
-          description: Resolution in the x direction
           minimum: 0
           exclusiveMinimum: true
-        y:
+        y: 
           type: number
-          description: Resolution in the y direction
           minimum: 0
           exclusiveMinimum: true
-outputs:
-  mosaickedFloodTiff:
-    title: Mosaicked Flood Raster
-    description: Reference to the output GeoTIFF file containing the combined mosaicked flood rasters
+      required: [x, y]
+inputs:
+  inputFiles:
+    title: Input Datasets
+    description: Array of flood observations (rasters or vector features)
+    schema:
+      type: array
+      items:
+        oneOf:
+          - type: string
+            format: uri
+            contentMediaType: image/tiff; application=geotiff
+          - type: string
+            format: uri
+            contentMediaType: application/geo+json
+          - type: string  
+            format: uri
+            contentMediaType: application/geopackage+gpkg
+            parameters:
+              layer_type: polygon
+      minItems: 1
+  clipGeometry:
+    title: Clipping Geometry
+    description: Optional GeoJSON polygon for clipping output
+    schema:
+      oneOf:
+        - allOf:
+          - format: geojson-geometry
+          - $ref: http://schemas.opengis.net/ogcapi/features/part1/1.0/openapi/schemas/geometryGeoJSON.yaml
+    minOccurs: 0
+  targetCRS:
+    title: Target CRS
+    description: Coordinate reference system for output as EPSG code (e.g. EPSG:4326)
     schema:
       type: string
-      format: uri
-      contentMediaType: image/tiff; application=geotiff
+      pattern: ^EPSG:[0-9]+$
+outputs:
+  mosaickedResult:
+    title: Combined Dataset
+    description: Unified flood observation data in raster or vector format
+    schema:
+      oneOf:
+        - type: string
+          format: uri
+          contentMediaType: image/tiff; application=geotiff
+        - type: string
+          format: uri
+          contentMediaType: application/geopackage+gpkg
+          parameters: 
+            geometry_type: polygon
