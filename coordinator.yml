@@ -31,8 +31,12 @@ arguments:
 inputs:
   area_of_interest:
     title: Analysis Area
-    description: URI reference to a GeoPackage file containing multipolygon geometry for analysis
+    description: URI reference to a GeoPackage file containing polygon or multipolygon geometry for analysis
     schema:
       type: string
       format: uri
       contentMediaType: application/geopackage+gpkg
+      parameters:
+        geometry_types: 
+          - Polygon
+          - MultiPolygon
