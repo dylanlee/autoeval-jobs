@@ -1,6 +1,4 @@
 id: hand_inundator
-version: 0.0.1
-title: HAND Inundation Mapper
 description: Generates flood inundation extents using HAND methodology and NWM forecasts
 outputTransmission:
   - reference
@@ -14,7 +12,7 @@ arguments:
       maximum: 4096
       default: 1024
 inputs:
-  catchment_
+  catchment:
     title: Catchment Metadata
     description: JSON file containing catchment properties and hydrotable
     schema:

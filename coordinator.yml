@@ -1,5 +1,4 @@
 id: coordinator
-title: Processing Coordinator
 description: Coordinates batch jobs performing HAND data evaluation against benchmark data
 outputTransmission:
   - reference
