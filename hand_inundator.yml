@@ -1,45 +1,56 @@
-id: inundate-branch
-title: Branch Inundation Process
-description: Generates flood extents for a specified hydroID catchment using HAND (Height Above Nearest Drainage) methodology
-
+id: hand_inundator
+version: 0.0.1
+title: HAND Inundation Mapper
+description: Generates flood inundation extents using HAND methodology and NWM forecasts
+outputTransmission:
+  - reference
+arguments:
+  window_size:
+    title: Processing Window Size
+    description: Tile dimensions for raster processing (pixels)
+    schema:
+      type: integer
+      minimum: 256
+      maximum: 4096
+      default: 1024
 inputs:
-  hand_dem:
+  catchment_
+    title: Catchment Metadata
+    description: JSON file containing catchment properties and hydrotable
+    schema:
+      type: string
+      format: uri
+      contentMediaType: application/json
+  forecast:
+    title: Flow Forecast
+    description: CSV file with NWM discharge predictions
+    schema:
+      type: string
+      format: uri
+      contentMediaType: text/csv
+  rem_raster:
     title: HAND REM
-    description: HAND (Height Above Nearest Drainage) relative elevation map of the branch
+    description: Relative Elevation Model raster
     schema:
       type: string
       format: uri
-      contentMediaType: image/tiff
-      
-  catchment:
-    title: Catchment Raster
-    description: Raster of the catchment where pixel values correspond to catchment ID
+      contentMediaType: image/tiff; application=geotiff
+  catchment_raster:
+    title: Catchment ID Raster
+    description: Raster mapping pixels to catchment IDs
     schema:
       type: string
       format: uri
-      contentMediaType: image/tiff
-
-  hydrotable:
-    title: Hydraulic Properties Table
-    description: CSV file containing hydraulic properties of the channel in the catchment
-    schema:
-      type: string
-      format: uri
-      contentMediaType: text/csv
-
-  flowfile:
-    title: Flow Information
-    description: CSV file containing flow information for the branch
-    schema:
-      type: string
-      format: uri
-      contentMediaType: text/csv
-
+      contentMediaType: image/tiff; application=geotiff
 outputs:
-  branch_extent:
-    title: Branch Extent Raster
-    description: Raster showing the branch extent
+  inundation_raster:
+    title: Inundation Map
+    description: Binary flood extent raster (1=inundated, 0=non-inundated) with 255 as no data
     schema:
       type: string
       format: uri
-      contentMediaType: image/tiff
+      contentMediaType: image/tiff; application=geotiff
+    parameters:
+      compression: lzw
+      dtype: uint8
+      no 255
