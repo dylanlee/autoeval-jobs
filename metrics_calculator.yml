@@ -1,24 +1,46 @@
 id: calculate-agreement-metrics
-description: Computes validation metrics like critical success index from an agreement map comparing two rasters
+description: Computes validation metrics from an agreement map (raster or vector polygons in EPSG:5070)
 outputTransmission:
   - value
   - reference
 inputs:
   agreementMap:
-    title: Agreement Map
-    description: Reference to a GeoTIFF containing an agreement map showing where two rasters agree/disagree
+    title: Agreement Dataset
+    description: Raster or vector polygons showing agreement areas in CONUS Albers (EPSG:5070)
     schema:
-      type: string
-      format: uri
-      contentMediaType: image/tiff; application=geotiff
+      oneOf:
+        - type: string
+          format: uri
+          contentMediaType: image/tiff; application=geotiff
+          parameters:
+            crs: 
+              const: EPSG:5070
+        - type: string
+          format: uri
+          contentMediaType: application/geopackage+gpkg
+          parameters:
+            geometry_type: polygon
+            crs:
+              const: EPSG:5070
 outputs:
   metrics:
-    title: Validation Metrics
-    description: Object containing various computed metrics analyzing the agreement between the compared rasters
+    title: Validation Metrics 
+    description: Object containing performance metrics for agreement between observations and models
     schema:
       type: object
-      additionalProperties:
-        oneOf:
-          - type: string
-          - type: integer
-          - type: number
+      properties:
+        csi:
+          type: number
+          minimum: 0
+          maximum: 1
+          description: Critical Success Index
+        pod:
+          type: number
+          minimum: 0
+          maximum: 1
+          description: Probability of Detection
+        far:
+          type: number
+          minimum: 0
+          maximum: 1
+          description: False Alarm Ratio
