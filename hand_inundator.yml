@@ -50,15 +50,35 @@ inputs:
 outputs:
   inundation_raster:
     title: Inundation Map
-    description: Binary flood extent raster (1=inundated, 0=non-inundated) in CONUS Albers (EPSG:5070)
+    description: Flood depth or extent raster in CONUS Albers (EPSG:5070)
     schema:
-      type: string
-      format: uri
-      contentMediaType: image/tiff; application=geotiff
-    parameters:
-      compression: lzw
-      dtype: uint8
-      nodata: 255
-      crs: 
-        const: EPSG:5070
-        description: Albers Equal Area Continental US projection
+      oneOf:
+        # Extent raster specification
+        - type: string
+          format: uri
+          contentMediaType: image/tiff; application=geotiff
+          parameters:
+            compression: lzw
+            dtype: uint8
+            nodata: 255
+            crs:
+              const: EPSG:5070
+          when:
+            properties:
+              output_type:
+                const: extent
+
+        # Depth raster specification
+        - type: string
+          format: uri
+          contentMediaType: image/tiff; application=geotiff
+          parameters:
+            compression: lzw
+            dtype: float32
+            nodata: -9999
+            crs:
+              const: EPSG:5070
+          when:
+            properties:
+              output_type:
+                const: depth
