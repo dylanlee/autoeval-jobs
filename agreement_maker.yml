@@ -1,9 +1,10 @@
 id: make-agreement
-description: Creates a binary agreement map showing where input datasets (raster/vector) spatially concur in EPSG:5070
+description: Creates an agreement map showing where input datasets (raster/vector) spatially concur. Works with depth or extent data. Produces either a depth agreement map or an extent agreement map, as raster or vector data in EPSG:5070.
+
 arguments:
   targetResolution:
-    title: Rasterization Resolution
-    description: Required when inputs include vector data (meters)
+    title: Resolution
+    description: desired resolution of output in cases whene output will be returned as raster (meters)
     schema:
       type: object
       properties:
@@ -11,47 +12,91 @@ arguments:
           type: number
           minimum: 0
           exclusiveMinimum: true
-        y: 
+        y:
           type: number
           minimum: 0
           exclusiveMinimum: true
       required: [x, y]
+
+  inputType:
+    title: Input Type
+    description: Specify whether the input datasets contain depth or extent data
+    schema:
+      type: string
+      enum: [depth, extent]
+
 inputs:
   dataset1:
     title: First Dataset
-    description: Vector polygon or raster dataset in EPSG:5070
+    description: Depth or extent dataset, raster or vector, in EPSG:5070
     schema:
       oneOf:
         - type: string
           format: uri
           contentMediaType: image/tiff; application=geotiff
           parameters:
-            crs: 
-              const: EPSG:5070
-        - type: string
-          format: uri
-          contentMediaType: application/geopackage+gpkg
-          parameters: 
-            geometry_type: polygon
             crs:
               const: EPSG:5070
+            data_type:
+              type: string
+              enum: [depth, extent]
+              const: 
+                $ref: '#/arguments/inputType'
+        - type: string
+          format: uri
+          contentMediaType: application/geopackage+sqlite3  # For vector data formats
+          parameters:
+            crs:
+              const: EPSG:5070
+            geometry_type:
+              type: string
+              enum: [Point, MultiPoint, Polygon]
+            data_type:
+              type: string
+              enum: [depth, extent]
+
   dataset2:
     title: Second Dataset
-    description: Vector polygon or raster dataset in EPSG:5070
+    description: Depth or extent dataset, raster or vector, in EPSG:5070
     schema:
       $ref: '#/inputs/dataset1/schema'
+
 outputs:
   agreementMap:
     title: Agreement Map
-    description: Binary raster (1=agreement, 0=disagreement) in CONUS Albers (EPSG:5070)
+    description: Depth or extent agreement map. Will be raster or vector data in EPSG:5070.
     schema:
-      type: string
-      format: uri
-      contentMediaType: image/tiff; application=geotiff
-    parameters:
-      compression: lzw
-      dtype: uint8
-      nodata: 255
-      crs: 
-        const: EPSG:5070
-        description: Albers Equal Area Continental US projection
+      oneOf:
+        - type: string
+          format: uri
+          contentMediaType: image/tiff; application=geotiff
+          when:
+            properties:
+              outputFormat:
+                const: raster
+          parameters:
+            crs:
+              const: EPSG:5070
+            compression: lzw
+            dtype:
+              type: string
+              enum:
+                - float32  # For depth agreement maps
+                - uint8   # For extent agreement maps
+            nodata:
+              oneOf:
+                - const: -9999  # For depth agreement maps
+                - const: 255    # For extent agreement maps
+        - type: string
+          format: uri
+          contentMediaType: application/geopackage+sqlite3
+          when:
+            properties:
+              outputFormat:
+                const: vector
+          parameters:
+            crs:
+              const: EPSG:5070
+            geometry_type:
+              type: string
+              enum: [Point, MultiPoint, Polygon]
