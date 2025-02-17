@@ -11,6 +11,13 @@ arguments:
       minimum: 256
       maximum: 4096
       default: 1024
+  output_type:
+    title: Output Data Type
+    description: Choose between depth values or binary inundation extent
+    schema:
+      type: string
+      enum: [extent, depth]
+      default: extent
 inputs:
   catchment:
     title: Catchment Metadata
