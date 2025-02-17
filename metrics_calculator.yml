@@ -1,15 +1,5 @@
 id: calculate-agreement-metrics
-version: 0.0.1
-title: Calculate Agreement Metrics
 description: Computes validation metrics like critical success index from an agreement map comparing two rasters
-keywords:
-  - metrics
-  - validation
-  - agreement
-  - statistics
-jobControlOptions:
-  - sync-execute
-  - async-execute
 outputTransmission:
   - value
   - reference
