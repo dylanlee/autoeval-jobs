@@ -18,13 +18,6 @@ arguments:
           exclusiveMinimum: true
       required: [x, y]
 
-  inputType:
-    title: Input Type
-    description: Specify whether the input datasets contain depth or extent data
-    schema:
-      type: string
-      enum: [depth, extent]
-
 inputs:
   dataset1:
     title: First Dataset
@@ -34,24 +27,22 @@ inputs:
         - type: string
           format: uri
           contentMediaType: image/tiff; application=geotiff
-          parameters:
+          properties:
             crs:
               const: EPSG:5070
-            data_type:
+            fim_type:
               type: string
               enum: [depth, extent]
-              const: 
-                $ref: '#/arguments/inputType'
         - type: string
           format: uri
           contentMediaType: application/geopackage+sqlite3  # For vector data formats
-          parameters:
+          properties:
             crs:
               const: EPSG:5070
             geometry_type:
               type: string
               enum: [Point, MultiPoint, Polygon]
-            data_type:
+            fim_type:
               type: string
               enum: [depth, extent]
 
@@ -74,7 +65,7 @@ outputs:
             properties:
               outputFormat:
                 const: raster
-          parameters:
+          properties:
             crs:
               const: EPSG:5070
             compression: lzw
@@ -90,11 +81,7 @@ outputs:
         - type: string
           format: uri
           contentMediaType: application/geopackage+sqlite3
-          when:
-            properties:
-              outputFormat:
-                const: vector
-          parameters:
+          properties:
             crs:
               const: EPSG:5070
             geometry_type:

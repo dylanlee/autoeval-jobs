@@ -35,8 +35,10 @@ inputs:
           - type: string  
             format: uri
             contentMediaType: application/geopackage+gpkg
-            parameters:
-              layer_type: polygon
+            properties:
+              layer_type:
+                type: string
+                enum: [polygon, multipolygon, multipoint]
       minItems: 1
   clipGeometry:
     title: Clipping Geometry
@@ -55,7 +57,7 @@ outputs:
         - type: string
           format: uri
           contentMediaType: image/tiff; application=geotiff
-          parameters:
+          properties:
             crs: 
               const: EPSG:5070
               description: Standard US analysis projection with equal area preservation
@@ -63,8 +65,10 @@ outputs:
         - type: string
           format: uri
           contentMediaType: application/geopackage+gpkg
-          parameters: 
-            geometry_type: polygon
+          properties: 
+            geometry_type:
+              type: string
+              enum: [polygon, multipolygon, multipoint]
             crs:
               const: EPSG:5070
               description: Albers Equal Area Continental US projection

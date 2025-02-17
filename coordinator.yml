@@ -15,7 +15,7 @@ arguments:
       type: string
   date_range:
     title: Date Range
-    description: Temporal filter for analysis
+    description: Temporal filter benchmark source. Not applicable to all benchmark sources.
     schema:
       type: [object, "null"]
       default: null
@@ -34,7 +34,7 @@ inputs:
       type: string
       format: uri
       contentMediaType: application/geopackage+gpkg
-      parameters:
+      properties:
         geometry_types: 
           - Polygon
           - MultiPolygon

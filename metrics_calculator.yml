@@ -12,13 +12,13 @@ inputs:
         - type: string
           format: uri
           contentMediaType: image/tiff; application=geotiff
-          parameters:
+          properties:
             crs: 
               const: EPSG:5070
         - type: string
           format: uri
           contentMediaType: application/geopackage+gpkg
-          parameters:
+          properties:
             geometry_type: polygon
             crs:
               const: EPSG:5070

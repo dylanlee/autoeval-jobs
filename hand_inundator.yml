@@ -57,7 +57,7 @@ outputs:
         - type: string
           format: uri
           contentMediaType: image/tiff; application=geotiff
-          parameters:
+          properties:
             compression: lzw
             dtype: uint8
             nodata: 255
@@ -72,7 +72,7 @@ outputs:
         - type: string
           format: uri
           contentMediaType: image/tiff; application=geotiff
-          parameters:
+          properties:
             compression: lzw
             dtype: float32
             nodata: -9999
