@@ -1,6 +1,6 @@
 # Flood Evuation Job Arguments, Inputs, and Outputs
 
-This repository contains a set of yaml files that specifies interfaces for the jobs that make up the FIM evaluation pipeline. The pipeline has been designed as a series of chained jobs that will be run by a batch processing solution. The primary focus is on inputs and outputs of each job and the job arguments/parameters. 
+This repository contains a set of yaml files that specifies interfaces for the jobs that make up the FIM evaluation pipeline. The pipeline has been designed as a series of chained jobs that will be run by a batch processing solution. The primary focus is on inputs and outputs of each job and each jobs arguments/parameters. 
 
 Below we give a human readable description of the contents of each yaml file.
 
@@ -11,35 +11,60 @@ The coordinator is the entrypoint to the evaluation pipeline. It takes a gpkg co
 The current evaluation pipeline is primarily designed to generate HAND FIM extents or depths and then evaluate these against relevant benchmark sources.
 
 ### Arguments
-- **HAND Version** identifier  
+- **HAND Version** 
   - The HAND version argument allows the user to specify a specific version of HAND to generate extents for. This argement is required.
-- **Benchmark Source** metadata  
-- Optional temporal **Date Range** filter  
-
-
+- **Benchmark Source** 
+  - This is a string that select which source will be used to evaluate HAND against. For example 'mip-ripple' will be used to select FEMA MIP data produced by ripple. This argument is required.
+- **Date Range** 
+  - Certain Benchmark sources contain flood scenarios that have a time component to them. For example high water mark data is associated with the flood  event associated with a given survey. This argument allows for filtering a Benchmark source to only return benchmark data within a certain date range.
  
 ### Inputs
-- **AOI**: GeoPackage polygon/multipolygon  
+- **AOI**
+  - This input is a geopackage that must contain either a polygon or multipolygon geometry. For every polygon the coordinator will generate a HAND extent and find benchmark data that lies within the polygon for the source selected by the user. The coordinator will then run all the rest of the jobs described in this repository to generate an evaluation for that polygon. 
 
 ## HAND Inundator (`hand_inundator`)
 ### Description  
-- Generates flood extent/depth maps using HAND methodology
+- Generates flood extent/depth maps from a HAND REM. This job inundates a *single* hand catchment. It can be configured to return either a depth FIM or an extent FIM.
 
 ### Arguments  
-- `window_size`: Tile processing size (256-4096px)  
-- `output_type`: Extent (binary) vs Depth (float values)  
+- **window_size**
+  - Tile processing size (256-4096px). The rasters that are used  
+- **output_type**
+  - Extent (binary) vs Depth (float values)  
 
 ### Input Requirements  
-- **Catchment**: JSON with hydro-id metadata  
-- **Forecast**: NWM discharge CSV  
-- **REMraster**: HAND relative elevation TIFF  
-- **Catchmentraster**: Spatial ID mapping TIFF  
+- **Catchment**:
+  - This input is a JSON file that contains a rating curve every HydroID in a HAND catchment along with metadata necessary to process the HydroID. It has the following structure:
+  ```json
+  {
+      "<catchment_id>": {
+        "hydrotable_entries": {
+          "<HydroID>": {
+            "stage": [<array_of_stage_values>],
+            "discharge_cms": [<array_of_discharge_values>],
+            "nwm_feature_id": <integer>,
+            "lake_id": <integer>
+          }
+          // More HydroID entries...
+        },
+        "raster_pair": {
+          "rem_raster_path": "<path_value>",
+          "catchment_raster_path": "<path_value>"
+        }
+      }
+  }
+  ```
+  - The **raster_pair** lists paths to the two rasters that are used to generate the HAND extent.
+  - **rem_raster_path**
+    - This is a path to a HAND relative elevation tiff for this catchment. This would typically be an s3 path but could be a local filepath as well. 
+  - **catchment_raster_path**
+    - This is a path to a tiff that helps map every location in the catchment to a rating curve associated with that location. Every pixel is assigned an integer value that reflects the HydroID of the sub-catchment it is in. This value can then be used to look up an associated rating curve in the hydrotable_entries object inside the catchment json. This rating curve is used to interpolate a stage value for a given NWM reach discharge. If the stage value is larger than the HAND value at that pixel then the pixel is marked flooded.
+- **Forecast**
+  - A csv file listing NWM feature_id values and their respective discharges. A stage is obtained for these discharges for each HydroID catchment by using the rating associated with that HydroID.
 
 ### Output Specifications  
-- **Inundation Raster**:  
-  *Extent*: uint8, nodata=255 | *Depth*: float32, nodata=-9999  
-  CRS: EPSG:5070, LZW compression  
-
+- **Inundation Raster**
+  - This is a depth or extent raster generated from the HAND data. The format of this raster is specified in `hand_inundator.yml'
 ---
 
 ## Agreement Maker (`make-agreement`) 

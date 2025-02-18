@@ -21,11 +21,41 @@ arguments:
 inputs:
   catchment:
     title: Catchment Metadata
-    description: JSON file containing catchment properties and rating curve for each hydro-id in catchment
+    description: JSON file containing catchment HydroID rating curves, metadata, and paths the raster data required to inundate the catchment
     schema:
-      type: string
-      format: uri
-      contentMediaType: application/json
+      type: object
+      properties:
+        hydrotable_entries:
+          type: object
+          additionalProperties:
+            type: object
+            properties:
+              stage:
+                type: array
+                items:
+                  type: number
+              discharge_cms:
+                type: array
+                items:
+                  type: number
+              nwm_feature_id:
+                type: integer
+              lake_id:
+                type: integer
+            required: [stage, discharge_cms, nwm_feature_id]
+        raster_pair:
+          type: object
+          properties:
+            rem_raster_path:
+              type: string
+              format: uri
+              contentMediaType: image/tiff; application=geotiff
+            catchment_raster_path:
+              type: string
+              format: uri
+              contentMediaType: image/tiff; application=geotiff
+          required: [rem_raster_path, catchment_raster_path]
+      required: [hydrotable_entries, raster_pair]
   forecast:
     title: Flow Forecast
     description: CSV file with NWM discharge predictions
@@ -33,20 +63,6 @@ inputs:
       type: string
       format: uri
       contentMediaType: text/csv
-  rem_raster:
-    title: HAND REM
-    description: Relative Elevation Model raster
-    schema:
-      type: string
-      format: uri
-      contentMediaType: image/tiff; application=geotiff
-  catchment_raster:
-    title: Catchment ID Raster
-    description: Raster mapping pixels to catchment IDs
-    schema:
-      type: string
-      format: uri
-      contentMediaType: image/tiff; application=geotiff
 outputs:
   inundation_raster:
     title: Inundation Map
@@ -67,7 +83,6 @@ outputs:
             properties:
               output_type:
                 const: extent
-
         # Depth raster specification
         - type: string
           format: uri
