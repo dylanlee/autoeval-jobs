@@ -1,4 +1,4 @@
-# Flood Evaluation Job Arguments, Inputs, and Outputs
+# FIM Evaluation Jobs Arguments, Inputs, and Outputs
 
 This repository contains a set of yaml files that specifies interfaces for the jobs that make up the HAND FIM evaluation pipeline. The pipeline has been designed as a series of chained jobs that will be run by a batch processing solution. The primary focus of this repo is on describing inputs and outputs of each job and each jobs arguments/parameters. 
 
