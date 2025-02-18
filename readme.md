@@ -1,10 +1,31 @@
-# Flood Analysis Toolkit Interface Documentation
+# Flood Evuation Job Arguments, Inputs, and Outputs
+
+This repository contains a set of yaml files that specifies interfaces for the jobs that make up the FIM evaluation pipeline. The pipeline has been designed as a series of chained jobs that will be run by a batch processing solution. The primary focus is on inputs and outputs of each job and the job arguments/parameters. 
+
+Below we give a human readable description of the contents of each yaml file.
+
+## Coordinator (`coordinator`)  
+### Description  
+The coordinator is the entrypoint to the evaluation pipeline. It takes a gpkg containing either a polygon or multipolygon geometry and then uses that to run and monitor batch jobs for each step along the evaluation pipeline for all the polygons submitted by the user. 
+
+The current evaluation pipeline is primarily designed to generate HAND FIM extents or depths and then evaluate these against relevant benchmark sources.
+
+### Arguments
+- **HAND Version** identifier  
+  - The HAND version argument allows the user to specify a specific version of HAND to generate extents for. This argement is required.
+- **Benchmark Source** metadata  
+- Optional temporal **Date Range** filter  
+
+
+ 
+### Inputs
+- **AOI**: GeoPackage polygon/multipolygon  
 
 ## HAND Inundator (`hand_inundator`)
 ### Description  
 - Generates flood extent/depth maps using HAND methodology
 
-### Key Arguments  
+### Arguments  
 - `window_size`: Tile processing size (256-4096px)  
 - `output_type`: Extent (binary) vs Depth (float values)  
 
@@ -25,7 +46,7 @@
 ### Description  
 - Creates concurrence maps between 2 datasets
 
-### Configuration  
+### Arguments  
 - **Resolution**: Mandatory x/y when outputting rasters  
 - **Input Compatibility**: Handles raster/vector depth/extent combos
 
@@ -69,14 +90,3 @@
 
 ---
 
-## Coordinator (`coordinator`)  
-### Description  
-- Orchestrates batch validation workflows  
-
-### Configuration Hooks  
-- **HAND Version** identifier  
-- **Benchmark Source** metadata  
-- Optional temporal **Date Range** filter  
-
-### Spatial Constraints  
-- **AOI**: GeoPackage polygon/multipolygon  
