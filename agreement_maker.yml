@@ -41,7 +41,7 @@ inputs:
               const: EPSG:5070
             geometry_type:
               type: string
-              enum: [Point, MultiPoint, Polygon]
+              enum: [Point, MultiPoint, Polygon, Multipolygon]
             fim_type:
               type: string
               enum: [depth, extent]
@@ -86,4 +86,4 @@ outputs:
               const: EPSG:5070
             geometry_type:
               type: string
-              enum: [Point, MultiPoint, Polygon]
+              enum: [Point, MultiPoint, Polygon, Multipolygon]
