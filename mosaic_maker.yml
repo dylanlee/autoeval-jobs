@@ -1,4 +1,4 @@
-id: mosaic-extents
+id: mosaic-fim
 description: Mosaics and homogenizes overlapping flood observations (raster or vector) into a combined dataset with optional clipping/reprojection
 outputTransmission:
   - reference

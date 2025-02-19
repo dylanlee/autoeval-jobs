@@ -22,7 +22,7 @@ The current evaluation pipeline is primarily designed to generate HAND FIM exten
 - **AOI**
   - This input is a geopackage that must contain either a polygon or multipolygon geometry. For every polygon the coordinator will generate a HAND extent and find benchmark data that lies within the polygon for the source selected by the user. The coordinator will then run all the rest of the jobs described in this repository to generate an evaluation for that polygon. 
 
-## HAND Inundator (`hand_inundator`)
+## HAND Inundator (`hand-inundator`)
 ### Description  
 - Generates flood extent/depth maps from a HAND REM. This job inundates a *single* hand catchment. It can be configured to return either a depth FIM or an extent FIM.
 
@@ -67,7 +67,7 @@ The current evaluation pipeline is primarily designed to generate HAND FIM exten
   - This is a depth or extent raster generated from the HAND data. The format of this raster is specified in `hand_inundator.yml'
 ---
 
-## Mosaic Maker (`mosaic-extents`) 
+## Mosaic Maker (`mosaic-fim`) 
 ### Description  
 This job mosaics flood extents and benchmark raster data from either HAND or benchmark sources using a pixel-wise NAN-MAX selection policy. That is, for all the images being mosaicked if there are overlapping raster pixels then the maximum value of the overlapping rasters at that pixel location is selected. No-Data values are not considered when selecting the maximum (they are treated as Nan) unless all the pixels are No-Data. Rasters can be either depth or extent rasters and the mosaicking policy for overlapping rasters will remain the same. Common input combinations and the behavior of the jobs in those cases are described below.
 
