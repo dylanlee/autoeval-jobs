@@ -56,8 +56,8 @@ inputs:
               contentMediaType: image/tiff; application=geotiff
           required: [rem_raster_path, catchment_raster_path]
       required: [hydrotable_entries, raster_pair]
-  forecast:
-    title: Flow Forecast
+  flow_scenario:
+    title: Flow Scenario
     description: CSV file with NWM discharge predictions
     schema:
       type: string

@@ -33,7 +33,7 @@ The current evaluation pipeline is primarily designed to generate HAND FIM exten
   - Extent (binary) vs Depth (float values)  
 
 ### Inputs 
-- **Catchment**:
+- **catchment**:
   - This input is a JSON file that contains a rating curve every HydroID in a HAND catchment along with metadata necessary to process the HydroID. It has the following structure:
   ```json
   {
@@ -59,7 +59,7 @@ The current evaluation pipeline is primarily designed to generate HAND FIM exten
     - This is a path to a HAND relative elevation tiff for this catchment. This would typically be an s3 path but could be a local filepath as well. 
     - **catchment_raster_path**
     - This is a path to a tiff that helps map every location in the catchment to a rating curve associated with that location. Every pixel is assigned an integer value that reflects the HydroID of the sub-catchment it is in. This value can then be used to look up an associated rating curve in the hydrotable_entries object inside the catchment json. This rating curve is used to interpolate a stage value for a given NWM reach discharge. If the stage value is larger than the HAND value at that pixel then the pixel is marked flooded.
-- **Forecast**
+- **flow_scenario**
   - A csv file listing NWM feature_id values and their respective discharges. A stage is obtained for these discharges for each HydroID catchment by using the rating associated with that HydroID.
 
 ### Outputs 
