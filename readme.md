@@ -14,7 +14,7 @@ The current evaluation pipeline is primarily designed to generate HAND FIM exten
 - **HAND Version** 
   - The HAND version argument allows the user to specify a specific version of HAND to generate extents for. This argument is required.
 - **Benchmark Source** 
-  - This is a string that select which source will be used to evaluate HAND against. For example 'mip-ripple' will be used to select FEMA MIP data produced by ripple. This argument is required.
+  - This is a string that select which source will be used to evaluate HAND against. For example 'ripple-mip' will be used to select FEMA MIP data produced by ripple. This argument is required.
 - **Date Range** 
   - Certain Benchmark sources contain flood scenarios that have a time component to them. For example high water mark data is associated with the flood  event associated with a given survey. This argument allows for filtering a Benchmark source to only return benchmark data within a certain date range.
  
@@ -69,7 +69,7 @@ The current evaluation pipeline is primarily designed to generate HAND FIM exten
 
 ## Mosaic Maker (`mosaic-extents`) 
 ### Description  
-This job mosaics flood extents and benchmark raster data from either HAND or benchmark sources using a pixel-wise NAN-MAX selection policy. That is, for all the images being mosaicked if there are overlapping raster pixels then the maximum value of the overlapping rasters at that pixel location is selected. No-Data values are not considered when selecting the maximum (they are treated as Nan) unless all the pixels are No-Data. Rasters can be either depth or extent rasters and the mosaicking policy for overlapping rasters mill remain the same. Common input combinations and the behavior of the jobs in those cases are described below.
+This job mosaics flood extents and benchmark raster data from either HAND or benchmark sources using a pixel-wise NAN-MAX selection policy. That is, for all the images being mosaicked if there are overlapping raster pixels then the maximum value of the overlapping rasters at that pixel location is selected. No-Data values are not considered when selecting the maximum (they are treated as Nan) unless all the pixels are No-Data. Rasters can be either depth or extent rasters and the mosaicking policy for overlapping rasters will remain the same. Common input combinations and the behavior of the jobs in those cases are described below.
 
 If vector data is being mosaicked then the behavior will depend on what type of geometry is described by the vector data. The allowed geometries are polygon, multipolygon, point, or multipoint.  
 
