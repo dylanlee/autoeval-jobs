@@ -1,4 +1,4 @@
-id: make-agreement
+id: agreement_maker
 description: Creates an agreement map showing where input datasets (raster/vector) spatially concur. Works with depth or extent data. Produces either a depth agreement map or an extent agreement map, as raster or vector data in EPSG:5070.
 
 arguments:

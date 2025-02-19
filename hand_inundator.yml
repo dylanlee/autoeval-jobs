@@ -1,4 +1,4 @@
-id: hand-inundator
+id: hand_inundator
 description: Generates flood inundation extents using HAND methodology and NWM forecasts
 outputTransmission:
   - reference

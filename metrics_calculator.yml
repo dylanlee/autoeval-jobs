@@ -1,4 +1,4 @@
-id: calculate-agreement-metrics
+id: metrics_calculator
 description: Computes validation metrics from an agreement map (raster or vector polygons in EPSG:5070)
 outputTransmission:
   - value
