@@ -109,6 +109,24 @@ Similarly to the mosaicking job geometry inputs and outputs, polygon geometries 
 - **Dataset1/Dataset2**:  
   - Raster or Vector (as geopackage). If a vector must be either a point, multipoint, multipolygon, or polygon geometry.  
 
+- **Mask dictionary**
+  - This is an optional json object that is composed of sub-objects that include paths to geopackage of masks to exclude or include in the final produced agreement. The input format is identical to the previous format that was previously used to mask areas over which to evaluate FIM model skill. Each mask geometry can also be buffered by setting a buffer flag to an integer value (with units of meters) in the sub-dictionaries "buffer" key.
+
+  ```json
+  mask_dict = {
+      "levees": {
+          "path": levee_path,
+          "buffer": None,
+          "operation": "exclude",
+      },
+      "waterbodies": {
+          "path": water_bod_path,
+          "buffer": None,
+          "operation": "exclude",
+      },
+  }
+  ```
+  
 ### Outputs 
 Output is either a single raster or a geopackage of vector information.
 
