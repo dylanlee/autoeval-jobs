@@ -52,6 +52,29 @@ inputs:
     schema:
       $ref: '#/inputs/dataset1/schema'
 
+  masks:
+    title: Mask Areas
+    description: JSON object defining geometric masks to include/exclude. Keys are mask names, values define path (URI to GPKG), buffer (meters or null), and operation (include/exclude).
+    schema:
+      type: object
+      additionalProperties:
+        type: object
+        properties:
+          path:
+            type: string
+            format: uri
+            contentMediaType: application/geopackage+sqlite3
+          buffer:
+            oneOf:
+              - type: number
+                minimum: 0
+              - type: "null"
+          operation:
+            type: string
+            enum: [include, exclude]
+        required: [path, buffer, operation]
+      required: []
+
 outputs:
   agreementMap:
     title: Agreement Map
