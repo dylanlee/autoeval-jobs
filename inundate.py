@@ -16,10 +16,10 @@ def main():
         description="Inundation mapping from NWM forecasts"
     )
     parser.add_argument(
-        "--catchment-data", required=True, help="S3 path to catchment JSON"
+        "--catchment-data", required=True, help="path to catchment JSON"
     )
     parser.add_argument(
-        "--forecast-path", required=True, help="S3 path to forecast CSV"
+        "--forecast-path", required=True, help="path to forecast CSV"
     )
     parser.add_argument(
         "--output-path", required=True, help="Output path for inundation raster"
