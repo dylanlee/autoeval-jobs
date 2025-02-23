@@ -24,5 +24,3 @@ COPY fim_mosaicker/ fim_mosaicker/
 COPY test/ test/
 COPY test/mock_data/ test/mock_data/
 
-# Set entry point (will be overridden by docker-compose command)
-ENTRYPOINT ["python"]

@@ -1,7 +1,7 @@
-version: '3.8'
 services:
   mosaic-test:
     build: .
+    entrypoint: []
     command: ['python', '-m', 'unittest', 'test.test_mosaic']
     volumes:
       - .:/app
