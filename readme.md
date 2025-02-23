@@ -1,6 +1,13 @@
-# FIM Evaluation Jobs Arguments, Inputs, and Outputs
+# tests
+To test the inundate script run:
 
-This repository contains a set of yaml files that specifies interfaces for the jobs that make up the HAND FIM evaluation pipeline. The pipeline has been designed as a series of chained jobs that will be run by a batch processing solution. The primary focus of this repo is on describing inputs and outputs of each job and each jobs arguments/parameters. 
+```
+python3 -m unittest test_inundate.py
+```
+
+# Interface definitions for FIM Evaluation Jobs Arguments, Inputs, and Outputs
+
+This interface directory contains a set of yaml files that specifies interfaces for the jobs that make up the HAND FIM evaluation pipeline. The pipeline has been designed as a series of chained jobs that will be run by a batch processing solution. The primary focus of this repo is on describing inputs and outputs of each job and each jobs arguments/parameters. 
 
 Below we give a human readable description of the contents of each yaml file. The descriptions also expand on the anticipated behavior of the jobs for common input and argument combinations. 
 
