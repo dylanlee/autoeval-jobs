@@ -125,19 +125,19 @@ def mosaic_rasters(
 
                     # Read and merge data from each source that overlaps this window
                     for src in src_files:
-                        # Check if source overlaps with window
-                        src_window = src.window(
-                            *rasterio.windows.from_bounds(
-                                *rasterio.transform.array_bounds(
-                                    y_size, x_size, window_transform
-                                ),
-                                src.transform,
-                            )
+                        # Compute the window bounds in mosaic coordinate space
+                        window_bounds = rasterio.transform.array_bounds(
+                            y_size, x_size, window_transform
                         )
 
+                        # Compute the corresponding window in the source raster
+                        src_window = src.window(*window_bounds)
+
+                        # Check if source overlaps with window
                         if src_window.width <= 0 or src_window.height <= 0:
                             continue
 
+                        # Read data from the source raster within src_window
                         data = src.read(1, window=src_window)
                         if data is None or data.size == 0:
                             continue
