@@ -8,3 +8,13 @@ services:
     environment:
       - CPLUS_INCLUDE_PATH=/usr/include/gdal
       - C_INCLUDE_PATH=/usr/include/gdal
+
+  inundate-test:
+    build: .
+    entrypoint: []
+    command: ['python', '-m', 'unittest', 'test.test_inundate']
+    volumes:
+      - .:/app
+    environment:
+      - CPLUS_INCLUDE_PATH=/usr/include/gdal
+      - C_INCLUDE_PATH=/usr/include/gdal

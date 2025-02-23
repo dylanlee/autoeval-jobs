@@ -15,7 +15,9 @@ class TestInundateScript(unittest.TestCase):
         cls.mock_data_dir = os.path.join(cls.test_dir, "mock_data")
 
         # Path to the script being tested
-        cls.script_path = os.path.join(os.path.dirname(cls.test_dir), "inundate.py")
+        cls.script_path = os.path.join(
+            os.path.dirname(cls.test_dir), "hand_inundator", "inundate.py"
+        )
 
         # Input paths
         cls.catchment_json = os.path.join(cls.mock_data_dir, "test_catchment.json")

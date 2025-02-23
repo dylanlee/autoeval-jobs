@@ -21,6 +21,7 @@ RUN pip install -r requirements.txt
 
 # Copy application code
 COPY fim_mosaicker/ fim_mosaicker/
+COPY hand_inundator/ hand_inundator/
 COPY test/ test/
 COPY test/mock_data/ test/mock_data/
 
