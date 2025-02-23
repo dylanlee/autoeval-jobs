@@ -56,9 +56,10 @@ class TestMosaicScript(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls):
+        print("cleaning up...")
         # Clean up the output file
-        if os.path.exists(cls.output_path):
-            os.remove(cls.output_path)
+        # if os.path.exists(cls.output_path):
+        # os.remove(cls.output_path)
 
 
 if __name__ == "__main__":
