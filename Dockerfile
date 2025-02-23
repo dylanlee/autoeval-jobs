@@ -20,7 +20,9 @@ COPY requirements.txt .
 RUN pip install -r requirements.txt
 
 # Copy application code
-COPY inundate.py .
+COPY fim_mosaicker/ fim_mosaicker/
+COPY test/ test/
+COPY test/mock_data/ test/mock_data/
 
-# Set entry point
-ENTRYPOINT ["python", "inundate.py"]
+# Set entry point (will be overridden by docker-compose command)
+ENTRYPOINT ["python"]
