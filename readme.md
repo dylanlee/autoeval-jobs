@@ -41,24 +41,22 @@ The current evaluation pipeline is primarily designed to generate HAND FIM exten
 
 ### Inputs 
 - **catchment**:
-  - This input is a JSON file that contains a rating curve every HydroID in a HAND catchment along with metadata necessary to process the HydroID. It has the following structure:
+  - This input is a JSON file that contains a rating curve every HydroID in a given HAND catchment along with metadata necessary to process the HydroID. It has the following structure:
   ```json
   {
-      "<catchment_id>": {
-        "hydrotable_entries": {
-          "<HydroID>": {
-            "stage": [<array_of_stage_values>],
-            "discharge_cms": [<array_of_discharge_values>],
-            "nwm_feature_id": <integer>,
-            "lake_id": <integer>
-          }
-          // More HydroID entries...
-        },
-        "raster_pair": {
-          "rem_raster_path": "<path_value>",
-          "catchment_raster_path": "<path_value>"
-        }
+    "hydrotable_entries": {
+      "<HydroID>": {
+        "stage": [<array_of_stage_values>],
+        "discharge_cms": [<array_of_discharge_values>],
+        "nwm_feature_id": <integer>,
+        "lake_id": <integer>
       }
+      // More HydroID entries...
+    },
+    "raster_pair": {
+      "rem_raster_path": "<path_value>",
+      "catchment_raster_path": "<path_value>"
+    }
   }
   ```
   - The **raster_pair** lists paths to the two rasters that are used to generate the HAND extent.
