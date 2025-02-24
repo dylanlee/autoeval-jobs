@@ -30,7 +30,7 @@ def main():
     args = parser.parse_args()
 
     # Configure AWS credentials for raster access
-    session = boto3.Session()
+    session = boto3.Session(region_name=os.environ.get('AWS_DEFAULT_REGION', 'us-east-1'))
     creds = session.get_credentials()
     os.environ.update(
         {
