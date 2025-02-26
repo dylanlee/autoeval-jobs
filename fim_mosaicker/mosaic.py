@@ -1,12 +1,10 @@
-import rasterio
-from rasterio.merge import merge
-from rasterio.windows import Window
-from rasterio.mask import mask
-import numpy as np
-from typing import Union, Optional, Literal
 import os
 import sys
-import fiona
+import json
+from typing import Union, Optional, Literal
+from pathlib import Path
+from osgeo import gdal
+import numpy as np
 
 
 def mosaic_rasters(
@@ -14,9 +12,9 @@ def mosaic_rasters(
     output_path: str,
     clip_geometry: Optional[Union[str, dict]] = None,
     fim_type: Literal["depth", "extent"] = "depth",
-    window_size: int = 256,
+    memory_limit: int = 512,
 ) -> str:
-    """Raster mosaicking using rasterio with block processing.
+    """Raster mosaicking using GDAL with gdalwarp.
 
     Parameters
     ----------
@@ -30,212 +28,204 @@ def mosaic_rasters(
         Type of FIM output, either "depth" or "extent".
         For depth: uses float32 dtype and -9999 as nodata.
         For extent: uses uint8 dtype and 255 as nodata, converts all nonzero values to 1.
-    window_size : int, optional
-        Size of the processing window in pixels.
+    memory_limit : int, optional
+        Memory limit for GDAL processing in MB.
 
     Returns
     -------
     str
         Path to the output raster.
-
-    Raises
-    ------
-    ValueError
-        If input parameters are invalid or no rasters provided.
-    RuntimeError
-        If unable to open input files or process data.
     """
-    if window_size <= 0:
-        raise ValueError("window_size must be positive")
-
-    if fim_type not in ["depth", "extent"]:
-        raise ValueError("fim_type must be either 'depth' or 'extent'")
-
     if not raster_paths:
         raise ValueError("No rasters provided for mosaicking.")
 
-    # Set raster properties based on fim_type
-    if fim_type == "depth":
-        nodata = -9999
-        dtype = "float32"
-    else:  # extent
-        nodata = 255
-        dtype = "uint8"
+    # Setup
+    gdal.UseExceptions()
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
 
-    # Open all rasters and get their metadata
-    src_files = []
+    # Set parameters based on fim_type
+    nodata = -9999 if fim_type == "depth" else 255
+    gdal_dtype = gdal.GDT_Float32 if fim_type == "depth" else gdal.GDT_Byte
+
+    # Handle clip geometry if provided
+    temp_json = None
+    clip_file = None
+    if clip_geometry:
+        if isinstance(clip_geometry, dict):
+            temp_json = f"{output_path}.temp.json"
+            with open(temp_json, "w") as f:
+                json.dump(clip_geometry, f)
+            clip_file = temp_json
+        else:
+            clip_file = clip_geometry
+
     try:
-        for path in raster_paths:
-            src = rasterio.open(path)
-            src_files.append(src)
+        # For "extent" type - we need to handle each raster differently
+        if fim_type == "extent":
+            # First, convert each input raster to binary (0 or 1) format
+            binary_rasters = []
+            for i, raster_path in enumerate(raster_paths):
+                binary_path = f"{output_path}.bin.{i}.tif"
+                binary_rasters.append(binary_path)
 
-        # Check that all rasters have the same CRS
-        crs = src_files[0].crs
-        if not all(src.crs == crs for src in src_files):
-            raise ValueError("All rasters must have the same CRS")
+                # Open source raster
+                src_ds = gdal.Open(raster_path)
+                if src_ds is None:
+                    raise RuntimeError(f"Failed to open raster: {raster_path}")
 
-        # Get bounds of the mosaic
-        bounds = [src.bounds for src in src_files]
-        left = min(bound.left for bound in bounds)
-        bottom = min(bound.bottom for bound in bounds)
-        right = max(bound.right for bound in bounds)
-        top = max(bound.top for bound in bounds)
+                # Read data
+                data = src_ds.GetRasterBand(1).ReadAsArray()
+                src_nodata = src_ds.GetRasterBand(1).GetNoDataValue()
 
-        # Get resolution (assuming all rasters have same resolution)
-        res = src_files[0].res
-        if not all(src.res == res for src in src_files):
-            raise ValueError("All rasters must have the same resolution")
+                # Create binary output
+                driver = gdal.GetDriverByName("GTiff")
+                dst_ds = driver.Create(
+                    binary_path,
+                    src_ds.RasterXSize,
+                    src_ds.RasterYSize,
+                    1,
+                    gdal.GDT_Byte,
+                    ["COMPRESS=LZW", "PREDICTOR=2", "TILED=YES"],
+                )
 
-        # Calculate output dimensions
-        width = int((right - left) / res[0] + 0.5)
-        height = int((top - bottom) / res[1] + 0.5)
+                # Copy projection and geotransform
+                dst_ds.SetGeoTransform(src_ds.GetGeoTransform())
+                dst_ds.SetProjection(src_ds.GetProjection())
+                dst_ds.GetRasterBand(1).SetNoDataValue(
+                    255
+                )  # Using 255 as nodata for binary
 
-        # Create output profile
-        profile = src_files[0].profile.copy()
-        profile.update(
-            {
-                "driver": "GTiff",
-                "height": height,
-                "width": width,
-                "transform": rasterio.transform.from_bounds(
-                    left, bottom, right, top, width, height
-                ),
-                "dtype": dtype,
-                "nodata": nodata,
-                "tiled": True,
-                "compress": "lzw",
-                "predictor": 2,
-            }
-        )
-
-        # Create output raster
-        os.makedirs(os.path.dirname(output_path), exist_ok=True)
-        with rasterio.open(output_path, "w", **profile) as dst:
-            # Process by blocks
-            for y in range(0, height, window_size):
-                y_size = min(window_size, height - y)
-                for x in range(0, width, window_size):
-                    x_size = min(window_size, width - x)
-
-                    window = Window(x, y, x_size, y_size)
-                    window_transform = dst.window_transform(window)
-
-                    # Initialize output block
-                    out_data = np.full((y_size, x_size), nodata, dtype=profile["dtype"])
-
-                    # Read and merge data from each source that overlaps this window
-                    for src in src_files:
-                        # Compute the window bounds in mosaic coordinate space
-                        window_bounds = rasterio.transform.array_bounds(
-                            y_size, x_size, window_transform
-                        )
-
-                        # Compute the corresponding window in the source raster
-                        src_window = src.window(*window_bounds)
-
-                        # Check if source overlaps with window
-                        if src_window.width <= 0 or src_window.height <= 0:
-                            continue
-
-                        # Read data from the source raster within src_window
-                        data = src.read(1, window=src_window)
-                        if data is None or data.size == 0:
-                            continue
-
-                        # For extent type, convert nonzero values to 1
-                        if fim_type == "extent":
-                            data = (data != 0).astype(np.uint8)
-
-                        # Update output with maximum values
-                        valid_mask = (
-                            data != src.nodata
-                            if src.nodata is not None
-                            else np.ones_like(data, dtype=bool)
-                        )
-                        np.maximum(
-                            out_data, np.where(valid_mask, data, nodata), out=out_data
-                        )
-
-                    # Write block
-                    dst.write(out_data, window=window, indexes=1)
-
-        # Apply clipping if geometry provided
-        if clip_geometry is not None:
-            with rasterio.open(output_path, "r+") as src:
-                if isinstance(clip_geometry, str):
-                    with fiona.open(clip_geometry, "r") as clip_file:
-                        geoms = [feature["geometry"] for feature in clip_file]
-                else:
-                    geoms = (
-                        [clip_geometry]
-                        if isinstance(clip_geometry, dict)
-                        else clip_geometry
+                # Convert to binary: 1 where data exists and is not 0, nodata elsewhere
+                dst_ds.GetRasterBand(1).WriteArray(
+                    np.where((data != src_nodata) & (data != 0), 1, 255).astype(
+                        np.uint8
                     )
+                )
 
-                out_data, out_transform = mask(src, geoms, crop=False, nodata=nodata)
-                src.write(out_data[0], indexes=1)
+                # Cleanup
+                src_ds = None
+                dst_ds = None
+
+            # Now mosaic the binary rasters with MAX resampling to preserve all 1s
+            warp_options = gdal.WarpOptions(
+                format="GTiff",
+                srcNodata=255,
+                dstNodata=255,
+                creationOptions=["COMPRESS=LZW", "PREDICTOR=2", "TILED=YES"],
+                outputType=gdal.GDT_Byte,
+                warpMemoryLimit=memory_limit,
+                resampleAlg="max",
+                cutlineDSName=clip_file,
+                cropToCutline=bool(clip_file),
+            )
+
+            # Perform the warp operation and ensure it completes
+            ds = gdal.Warp(output_path, binary_rasters, options=warp_options)
+            if ds is None:
+                raise RuntimeError("Failed to create mosaic")
+
+            # Explicitly flush and close the dataset to ensure data is written
+            ds.FlushCache()
+            ds = None  # Close dataset
+
+            # Verify the output file exists and has valid size
+            if not os.path.exists(output_path):
+                raise RuntimeError(f"Output file was not created: {output_path}")
+            if os.path.getsize(output_path) == 0:
+                raise RuntimeError(f"Output file is empty: {output_path}")
+
+            # Clean up temporary binary rasters
+            for binary_path in binary_rasters:
+                if os.path.exists(binary_path):
+                    os.remove(binary_path)
+
+            return output_path
+
+        else:  # For depth type, directly warp to output
+            warp_options = gdal.WarpOptions(
+                format="GTiff",
+                srcNodata=nodata,
+                dstNodata=nodata,
+                creationOptions=["COMPRESS=LZW", "PREDICTOR=2", "TILED=YES"],
+                outputType=gdal_dtype,
+                warpMemoryLimit=memory_limit,
+                resampleAlg="max",
+                cutlineDSName=clip_file,
+                cropToCutline=bool(clip_file),
+            )
+
+            # Perform the warp operation and ensure it completes
+            ds = gdal.Warp(output_path, raster_paths, options=warp_options)
+            if ds is None:
+                raise RuntimeError("Failed to create mosaic")
+
+            # Explicitly flush and close the dataset to ensure data is written
+            ds.FlushCache()
+            ds = None  # Close dataset
+
+            # Verify the output file exists and has valid size
+            if not os.path.exists(output_path):
+                raise RuntimeError(f"Output file was not created: {output_path}")
+            if os.path.getsize(output_path) == 0:
+                raise RuntimeError(f"Output file is empty: {output_path}")
+
+            return output_path
+
+    except Exception as e:
+        if os.path.exists(output_path):
+            os.remove(output_path)
+        raise RuntimeError(f"Error during mosaic processing: {str(e)}")
 
     finally:
-        # Close all source files
-        for src in src_files:
-            src.close()
-
-    return output_path
+        if temp_json and os.path.exists(temp_json):
+            os.remove(temp_json)
 
 
 if __name__ == "__main__":
     import argparse
-    from pathlib import Path
 
     parser = argparse.ArgumentParser(
         description="Mosaic multiple rasters with optional clipping.",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
-
     parser.add_argument(
         "raster_paths",
         nargs="+",
         type=Path,
         help="Paths to the input rasters to be mosaicked",
     )
-
     parser.add_argument(
         "output_path", type=Path, help="Path where to save the mosaicked output"
     )
-
     parser.add_argument(
         "--clip-geometry",
         type=Path,
         help="Optional path to vector file for clipping the output",
     )
-
     parser.add_argument(
         "--fim-type",
         choices=["depth", "extent"],
         default="depth",
         help="Type of FIM output (affects data type and nodata value)",
     )
-
     parser.add_argument(
-        "--window-size",
+        "--memory-limit",
         type=int,
-        default=256,
-        help="Size of the processing window in pixels",
+        default=512,
+        help="Memory limit for GDAL processing in MB",
     )
 
     args = parser.parse_args()
 
     try:
-        # Convert Path objects to strings for the main function
         output_raster = mosaic_rasters(
             raster_paths=[str(p) for p in args.raster_paths],
             output_path=str(args.output_path),
             clip_geometry=str(args.clip_geometry) if args.clip_geometry else None,
             fim_type=args.fim_type,
-            window_size=args.window_size,
+            memory_limit=args.memory_limit,
         )
         print(f"Successfully created mosaic: {output_raster}")
-
     except Exception as e:
         print(f"Error: {str(e)}", file=sys.stderr)
         sys.exit(1)
