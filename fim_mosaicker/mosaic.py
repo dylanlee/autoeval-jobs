@@ -91,16 +91,16 @@ def mosaic_rasters(
                 # Copy projection and geotransform
                 dst_ds.SetGeoTransform(src_ds.GetGeoTransform())
                 dst_ds.SetProjection(src_ds.GetProjection())
-                dst_ds.GetRasterBand(1).SetNoDataValue(
-                    255
-                )  # Using 255 as nodata for binary
+                dst_ds.GetRasterBand(1).SetNoDataValue(255)  # Using 255 as nodata for binary
 
                 # Convert to binary: 1 where data exists and is not 0, 0 for zeros, nodata elsewhere
-                dst_ds.GetRasterBand(1).WriteArray(
-                    np.where(data != src_nodata, 
-                             np.where(data != 0, 1, 0),  # If not no 1 for non-zero, 0 for zero
-                             255).astype(np.uint8)       # If no 255
-                )
+                binary_data = np.where(
+                    data != src_nodata,
+                    np.where(data != 0, 1, 0),  # If not no 1 for non-zero, 0 for zero
+                    255,  # If no 255
+                ).astype(np.uint8)
+                
+                dst_ds.GetRasterBand(1).WriteArray(binary_data)
 
                 # Cleanup
                 src_ds = None
@@ -114,7 +114,8 @@ def mosaic_rasters(
                 creationOptions=["COMPRESS=LZW", "PREDICTOR=2", "TILED=YES"],
                 outputType=gdal.GDT_Byte,
                 warpMemoryLimit=memory_limit,
-                resampleAlg="max",
+                resampleAlg="max",  # Use max to preserve all 1s
+                multithread=True,   # Enable multithreading for better performance
                 cutlineDSName=clip_file,
                 cropToCutline=bool(clip_file),
             )
