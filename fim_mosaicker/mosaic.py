@@ -14,7 +14,7 @@ def mosaic_rasters(
     fim_type: Literal["depth", "extent"] = "depth",
     memory_limit: int = 512,
 ) -> str:
-    """Raster mosaicking using GDAL with pixelwise maximum."""
+    """Raster mosaicking using GDAL with pixelwise maximum and memory limits."""
     if not raster_paths:
         raise ValueError("No rasters provided for mosaicking.")
 
@@ -46,22 +46,35 @@ def mosaic_rasters(
                 binary_path = f"{output_path}.bin.{i}.tif"
                 binary_rasters.append(binary_path)
                 
-                # Open source raster
+                # Process in blocks to respect memory limits
                 src_ds = gdal.Open(raster_path)
                 if src_ds is None:
                     raise RuntimeError(f"Failed to open raster: {raster_path}")
                 
-                # Read data and nodata value
+                # Get raster dimensions and block size
+                xsize = src_ds.RasterXSize
+                ysize = src_ds.RasterYSize
                 band = src_ds.GetRasterBand(1)
-                data = band.ReadAsArray()
                 src_nodata = band.GetNoDataValue()
                 
-                # Create binary output
+                # Calculate optimal block size based on memory limit
+                # Assuming 4 bytes per pixel (float32)
+                bytes_per_pixel = 4 if fim_type == "depth" else 1
+                max_pixels = (memory_limit * 1024 * 1024) // bytes_per_pixel
+                
+                # Get the block size from the raster if available
+                block_xsize, block_ysize = band.GetBlockSize()
+                if block_xsize == xsize:  # If raster is not tiled
+                    # Calculate a reasonable block size
+                    block_ysize = min(512, ysize)
+                    block_xsize = min(int(max_pixels / block_ysize), xsize)
+                
+                # Create output binary raster
                 driver = gdal.GetDriverByName("GTiff")
                 dst_ds = driver.Create(
                     binary_path,
-                    src_ds.RasterXSize,
-                    src_ds.RasterYSize,
+                    xsize,
+                    ysize,
                     1,
                     gdal.GDT_Byte,
                     ["COMPRESS=LZW", "PREDICTOR=2", "TILED=YES"],
@@ -72,14 +85,24 @@ def mosaic_rasters(
                 dst_ds.SetProjection(src_ds.GetProjection())
                 dst_ds.GetRasterBand(1).SetNoDataValue(255)
                 
-                # Convert to binary: 1 where data exists and is not 0, 0 for zeros, nodata elsewhere
-                binary_data = np.where(
-                    data != src_nodata,
-                    np.where(data != 0, 1, 0),
-                    255
-                ).astype(np.uint8)
-                
-                dst_ds.GetRasterBand(1).WriteArray(binary_data)
+                # Process the raster in blocks
+                for y in range(0, ysize, block_ysize):
+                    actual_block_ysize = min(block_ysize, ysize - y)
+                    for x in range(0, xsize, block_xsize):
+                        actual_block_xsize = min(block_xsize, xsize - x)
+                        
+                        # Read block data
+                        data = band.ReadAsArray(x, y, actual_block_xsize, actual_block_ysize)
+                        
+                        # Convert to binary: 1 where data exists and is not 0, 0 for zeros, nodata elsewhere
+                        binary_data = np.where(
+                            data != src_nodata,
+                            np.where(data != 0, 1, 0),
+                            255
+                        ).astype(np.uint8)
+                        
+                        # Write block to output
+                        dst_ds.GetRasterBand(1).WriteArray(binary_data, x, y)
                 
                 # Cleanup
                 src_ds = None
@@ -91,55 +114,38 @@ def mosaic_rasters(
             # For depth type, use original rasters
             input_rasters = raster_paths
         
-        # Get info from first raster to set up output
-        template_ds = gdal.Open(input_rasters[0])
-        driver = gdal.GetDriverByName("GTiff")
-        
-        # Create output raster with same dimensions as template
-        dst_ds = driver.Create(
-            output_path,
-            template_ds.RasterXSize,
-            template_ds.RasterYSize,
-            1,
-            gdal_dtype,
-            ["COMPRESS=LZW", "PREDICTOR=2", "TILED=YES"],
+        # Create a VRT from all input rasters
+        vrt_path = f"{output_path}.vrt"
+        vrt_options = gdal.BuildVRTOptions(
+            resolution='highest',
+            separate=False,
+            srcNodata=255 if fim_type == "extent" else None,
+            VRTNodata=nodata,
         )
         
-        # Copy projection and geotransform
-        dst_ds.SetGeoTransform(template_ds.GetGeoTransform())
-        dst_ds.SetProjection(template_ds.GetProjection())
-        dst_ds.GetRasterBand(1).SetNoDataValue(nodata)
+        vrt_ds = gdal.BuildVRT(vrt_path, input_rasters, options=vrt_options)
+        vrt_ds.FlushCache()
+        vrt_ds = None
         
-        # Initialize output with nodata
-        result = np.full((template_ds.RasterYSize, template_ds.RasterXSize), nodata, 
-                         dtype=np.float32 if fim_type == "depth" else np.uint8)
+        # Use gdal.Warp with max resampling and memory limit
+        warp_options = gdal.WarpOptions(
+            format="GTiff",
+            srcNodata=nodata,
+            dstNodata=nodata,
+            multithread=True,
+            warpMemoryLimit=memory_limit,
+            creationOptions=["COMPRESS=LZW", "PREDICTOR=2", "TILED=YES"],
+            resampleAlg="max",  # Use max resampling
+            callback=gdal.TermProgress_nocb,
+            cutlineDSName=clip_file,
+            cropToCutline=bool(clip_file),
+        )
         
-        # Process each input raster
-        for raster_path in input_rasters:
-            with gdal.Open(raster_path) as src_ds:
-                src_band = src_ds.GetRasterBand(1)
-                src_nodata = src_band.GetNoDataValue()
-                src_data = src_band.ReadAsArray()
-                
-                # Create masks for valid data
-                result_valid = result != nodata
-                src_valid = src_data != src_nodata
-                
-                # Where result has no data but source does, use source
-                result = np.where(~result_valid & src_valid, src_data, result)
-                
-                # Where both have data, take maximum
-                result = np.where(result_valid & src_valid, 
-                                  np.maximum(result, src_data), 
-                                  result)
+        gdal.Warp(output_path, vrt_path, options=warp_options)
         
-        # Write result to output
-        dst_ds.GetRasterBand(1).WriteArray(result)
-        dst_ds.FlushCache()
-        
-        # Cleanup
-        template_ds = None
-        dst_ds = None
+        # Clean up VRT
+        if os.path.exists(vrt_path):
+            os.remove(vrt_path)
         
         # Clean up temporary binary rasters
         if fim_type == "extent":
