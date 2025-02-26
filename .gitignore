@@ -1,2 +1,5 @@
 .aider*
-.env
+.env/
+.venv/
+__pycache__/
+*.aux.xml
