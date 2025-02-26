@@ -1,27 +1,38 @@
-FROM python:3.12-slim
+# Use the GDAL Ubuntu image directly
+FROM ghcr.io/osgeo/gdal:ubuntu-small-3.10.2
 
-# Install system dependencies
+# Install Python, pip, and venv
 RUN apt-get update && apt-get install -y \
-    gdal-bin \
-    libgdal-dev \
-    gcc \
-    g++ \
+    python3 \
+    python3-pip \
+    python3-dev \
+    python3-venv \
     && rm -rf /var/lib/apt/lists/*
-
-# Set environment variables for GDAL
-ENV CPLUS_INCLUDE_PATH=/usr/include/gdal
-ENV C_INCLUDE_PATH=/usr/include/gdal
 
 # Create and set working directory
 WORKDIR /app
 
-# Copy requirements first to leverage Docker cache
+# Get GDAL version and set as environment variable
+RUN export GDAL_VERSION=$(gdal-config --version) && \
+    echo "GDAL_VERSION=$GDAL_VERSION" >> /etc/environment
+
+# Create a virtual environment
+RUN python3 -m venv /app/venv --system-site-packages
+
+# Use the virtual environment
+ENV PATH="/app/venv/bin:$PATH"
+
+# Copy requirements and install Python dependencies
 COPY requirements.txt .
-RUN pip install -r requirements.txt
+
+# Install Python dependencies in the virtual environment
+RUN pip install --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
 COPY fim_mosaicker/ fim_mosaicker/
 COPY hand_inundator/ hand_inundator/
 COPY test/ test/
-COPY test/mock_data/ test/mock_data/
 
+# Create mock_data directory for tests
+RUN mkdir -p test/mock_data/
