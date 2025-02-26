@@ -8,6 +8,8 @@ services:
     environment:
       - CPLUS_INCLUDE_PATH=/usr/include/gdal
       - C_INCLUDE_PATH=/usr/include/gdal
+      - VIRTUAL_ENV=/opt/venv
+      - PATH=/opt/venv/bin:$PATH
 
   inundate-test:
     build: .
@@ -23,3 +25,5 @@ services:
       - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
       - AWS_SESSION_TOKEN=${AWS_SESSION_TOKEN}
       - AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION:-us-east-1}
+      - VIRTUAL_ENV=/opt/venv
+      - PATH=/opt/venv/bin:$PATH

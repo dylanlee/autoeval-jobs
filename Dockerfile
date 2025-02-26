@@ -16,11 +16,12 @@ WORKDIR /app
 RUN export GDAL_VERSION=$(gdal-config --version) && \
     echo "GDAL_VERSION=$GDAL_VERSION" >> /etc/environment
 
-# Create a virtual environment
-RUN python3 -m venv /app/venv --system-site-packages
+# Create a virtual environment in a location that won't be hidden by volume mounts
+RUN python3 -m venv /opt/venv --system-site-packages
 
 # Use the virtual environment
-ENV PATH="/app/venv/bin:$PATH"
+ENV PATH="/opt/venv/bin:$PATH"
+ENV VIRTUAL_ENV="/opt/venv"
 
 # Copy requirements and install Python dependencies
 COPY requirements.txt .
