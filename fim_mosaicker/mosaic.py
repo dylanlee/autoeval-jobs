@@ -44,7 +44,12 @@ def mosaic_rasters(
         If input parameters are invalid or no rasters provided.
     RuntimeError
         If unable to open input files or process data.
+
+    Usage example
+    ------
+    python3 /app/fim_mosaicker/mosaic.py /app/test/mock_data/raster1.tif /app/test/mock_data/raster2.tif /app/test/mock_data/raster3.tif /app/test/mock_data/raster4.tif /app/test/mock_data/mosaicked_raster.tif
     """
+
     if window_size <= 0:
         raise ValueError("window_size must be positive")
 

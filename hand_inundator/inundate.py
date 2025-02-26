@@ -12,7 +12,7 @@ from typing import Optional, Union, Dict, Any
 
 
 def inundate(
-    catchment_ Union[str, Dict[str, Any]],
+    catchment_data: Union[str, Dict[str, Any]],
     forecast_path: str,
     output_path: str,
     window_size: int = 1024,
@@ -42,7 +42,9 @@ def inundate(
         If no matching forecast data for catchment features.
     """
     # Configure AWS credentials for raster access
-    session = boto3.Session(region_name=os.environ.get('AWS_DEFAULT_REGION', 'us-east-1'))
+    session = boto3.Session(
+        region_name=os.environ.get("AWS_DEFAULT_REGION", "us-east-1")
+    )
     creds = session.get_credentials()
     if creds:
         os.environ.update(
@@ -140,7 +142,6 @@ def inundate(
 
 
 def main():
-    """Parse command line arguments and run the inundation process."""
     parser = argparse.ArgumentParser(
         description="Inundation mapping from NWM forecasts",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
@@ -148,9 +149,7 @@ def main():
     parser.add_argument(
         "--catchment-data", required=True, help="Path to catchment JSON"
     )
-    parser.add_argument(
-        "--forecast-path", required=True, help="Path to forecast CSV"
-    )
+    parser.add_argument("--forecast-path", required=True, help="Path to forecast CSV")
     parser.add_argument(
         "--output-path", required=True, help="Output path for inundation raster"
     )
@@ -169,6 +168,7 @@ def main():
         print(f"Successfully created inundation raster: {output_raster}")
     except Exception as e:
         import sys
+
         print(f"Error: {str(e)}", file=sys.stderr)
         sys.exit(1)
 

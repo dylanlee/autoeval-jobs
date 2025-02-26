@@ -65,8 +65,8 @@ class TestMosaicScript(unittest.TestCase):
             self.script_path,
             *self.raster_paths,
             self.output_path,
-            "--fim-type",
-            "extent",
+            # "--fim-type",
+            # "extent",
         ]
 
         # Print the command being run
@@ -118,11 +118,11 @@ class TestMosaicScript(unittest.TestCase):
                     np.all((valid_data == 0) | (valid_data == 1)),
                     "Extent raster contains values other than 0, 1, and nodata",
                 )
-                
+
             # Check that there are 1s in the output (corners should be 1)
             self.assertTrue(
                 np.any(data == 1),
-                "Extent raster doesn't contain any 1 values, but should have corner tiles with 1s"
+                "Extent raster doesn't contain any 1 values, but should have corner tiles with 1s",
             )
 
     @classmethod
