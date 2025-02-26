@@ -95,11 +95,11 @@ def mosaic_rasters(
                     255
                 )  # Using 255 as nodata for binary
 
-                # Convert to binary: 1 where data exists and is not 0, nodata elsewhere
+                # Convert to binary: 1 where data exists and is not 0, 0 for zeros, nodata elsewhere
                 dst_ds.GetRasterBand(1).WriteArray(
-                    np.where((data != src_nodata) & (data != 0), 1, 255).astype(
-                        np.uint8
-                    )
+                    np.where(data != src_nodata, 
+                             np.where(data != 0, 1, 0),  # If not no 1 for non-zero, 0 for zero
+                             255).astype(np.uint8)       # If no 255
                 )
 
                 # Cleanup

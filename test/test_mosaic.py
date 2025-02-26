@@ -111,12 +111,12 @@ class TestMosaicScript(unittest.TestCase):
                 "Raster contains no valid data (all nodata values)",
             )
 
-            # For extent type, check that all values are either 1 or nodata
+            # For extent type, check that all values are either 0, 1 or nodata
             valid_data = data[data != src.nodata]
             if len(valid_data) > 0:
                 self.assertTrue(
-                    np.all(valid_data == 1),
-                    "Extent raster contains values other than 1 and nodata",
+                    np.all((valid_data == 0) | (valid_data == 1)),
+                    "Extent raster contains values other than 0, 1, and nodata",
                 )
 
     @classmethod
