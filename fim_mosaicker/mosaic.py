@@ -14,28 +14,7 @@ def mosaic_rasters(
     fim_type: Literal["depth", "extent"] = "depth",
     memory_limit: int = 512,
 ) -> str:
-    """Raster mosaicking using GDAL with gdalwarp.
-
-    Parameters
-    ----------
-    raster_paths : list[str]
-        List of paths to rasters to be mosaicked.
-    output_path : str
-        Path where to save the mosaicked output.
-    clip_geometry : str or dict, optional
-        Vector file path or GeoJSON-like geometry to clip the output raster.
-    fim_type : str, optional
-        Type of FIM output, either "depth" or "extent".
-        For depth: uses float32 dtype and -9999 as nodata.
-        For extent: uses uint8 dtype and 255 as nodata, converts all nonzero values to 1.
-    memory_limit : int, optional
-        Memory limit for GDAL processing in MB.
-
-    Returns
-    -------
-    str
-        Path to the output raster.
-    """
+    """Raster mosaicking using GDAL with pixelwise maximum."""
     if not raster_paths:
         raise ValueError("No rasters provided for mosaicking.")
 
@@ -60,23 +39,23 @@ def mosaic_rasters(
             clip_file = clip_geometry
 
     try:
-        # For "extent" type - we need to handle each raster differently
+        # For "extent" type, convert each raster to binary format first
         if fim_type == "extent":
-            # First, convert each input raster to binary (0 or 1) format
             binary_rasters = []
             for i, raster_path in enumerate(raster_paths):
                 binary_path = f"{output_path}.bin.{i}.tif"
                 binary_rasters.append(binary_path)
-
+                
                 # Open source raster
                 src_ds = gdal.Open(raster_path)
                 if src_ds is None:
                     raise RuntimeError(f"Failed to open raster: {raster_path}")
-
-                # Read data
-                data = src_ds.GetRasterBand(1).ReadAsArray()
-                src_nodata = src_ds.GetRasterBand(1).GetNoDataValue()
-
+                
+                # Read data and nodata value
+                band = src_ds.GetRasterBand(1)
+                data = band.ReadAsArray()
+                src_nodata = band.GetNoDataValue()
+                
                 # Create binary output
                 driver = gdal.GetDriverByName("GTiff")
                 dst_ds = driver.Create(
@@ -87,96 +66,94 @@ def mosaic_rasters(
                     gdal.GDT_Byte,
                     ["COMPRESS=LZW", "PREDICTOR=2", "TILED=YES"],
                 )
-
+                
                 # Copy projection and geotransform
                 dst_ds.SetGeoTransform(src_ds.GetGeoTransform())
                 dst_ds.SetProjection(src_ds.GetProjection())
-                dst_ds.GetRasterBand(1).SetNoDataValue(255)  # Using 255 as nodata for binary
-
+                dst_ds.GetRasterBand(1).SetNoDataValue(255)
+                
                 # Convert to binary: 1 where data exists and is not 0, 0 for zeros, nodata elsewhere
                 binary_data = np.where(
                     data != src_nodata,
-                    np.where(data != 0, 1, 0),  # If not no 1 for non-zero, 0 for zero
-                    255,  # If no 255
+                    np.where(data != 0, 1, 0),
+                    255
                 ).astype(np.uint8)
                 
                 dst_ds.GetRasterBand(1).WriteArray(binary_data)
-
+                
                 # Cleanup
                 src_ds = None
                 dst_ds = None
-
-            # Now mosaic the binary rasters with MAX resampling to preserve all 1s
-            warp_options = gdal.WarpOptions(
-                format="GTiff",
-                srcNodata=255,
-                dstNodata=255,
-                creationOptions=["COMPRESS=LZW", "PREDICTOR=2", "TILED=YES"],
-                outputType=gdal.GDT_Byte,
-                warpMemoryLimit=memory_limit,
-                resampleAlg="max",  # Use max to preserve all 1s
-                multithread=True,   # Enable multithreading for better performance
-                cutlineDSName=clip_file,
-                cropToCutline=bool(clip_file),
-            )
-
-            # Perform the warp operation and ensure it completes
-            ds = gdal.Warp(output_path, binary_rasters, options=warp_options)
-            if ds is None:
-                raise RuntimeError("Failed to create mosaic")
-
-            # Explicitly flush and close the dataset to ensure data is written
-            ds.FlushCache()
-            ds = None  # Close dataset
-
-            # Verify the output file exists and has valid size
-            if not os.path.exists(output_path):
-                raise RuntimeError(f"Output file was not created: {output_path}")
-            if os.path.getsize(output_path) == 0:
-                raise RuntimeError(f"Output file is empty: {output_path}")
-
-            # Clean up temporary binary rasters
+            
+            # Use the binary rasters for mosaicking
+            input_rasters = binary_rasters
+        else:
+            # For depth type, use original rasters
+            input_rasters = raster_paths
+        
+        # Get info from first raster to set up output
+        template_ds = gdal.Open(input_rasters[0])
+        driver = gdal.GetDriverByName("GTiff")
+        
+        # Create output raster with same dimensions as template
+        dst_ds = driver.Create(
+            output_path,
+            template_ds.RasterXSize,
+            template_ds.RasterYSize,
+            1,
+            gdal_dtype,
+            ["COMPRESS=LZW", "PREDICTOR=2", "TILED=YES"],
+        )
+        
+        # Copy projection and geotransform
+        dst_ds.SetGeoTransform(template_ds.GetGeoTransform())
+        dst_ds.SetProjection(template_ds.GetProjection())
+        dst_ds.GetRasterBand(1).SetNoDataValue(nodata)
+        
+        # Initialize output with nodata
+        result = np.full((template_ds.RasterYSize, template_ds.RasterXSize), nodata, 
+                         dtype=np.float32 if fim_type == "depth" else np.uint8)
+        
+        # Process each input raster
+        for raster_path in input_rasters:
+            with gdal.Open(raster_path) as src_ds:
+                src_band = src_ds.GetRasterBand(1)
+                src_nodata = src_band.GetNoDataValue()
+                src_data = src_band.ReadAsArray()
+                
+                # Create masks for valid data
+                result_valid = result != nodata
+                src_valid = src_data != src_nodata
+                
+                # Where result has no data but source does, use source
+                result = np.where(~result_valid & src_valid, src_data, result)
+                
+                # Where both have data, take maximum
+                result = np.where(result_valid & src_valid, 
+                                  np.maximum(result, src_data), 
+                                  result)
+        
+        # Write result to output
+        dst_ds.GetRasterBand(1).WriteArray(result)
+        dst_ds.FlushCache()
+        
+        # Cleanup
+        template_ds = None
+        dst_ds = None
+        
+        # Clean up temporary binary rasters
+        if fim_type == "extent":
             for binary_path in binary_rasters:
                 if os.path.exists(binary_path):
                     os.remove(binary_path)
-
-            return output_path
-
-        else:  # For depth type, directly warp to output
-            warp_options = gdal.WarpOptions(
-                format="GTiff",
-                srcNodata=nodata,
-                dstNodata=nodata,
-                creationOptions=["COMPRESS=LZW", "PREDICTOR=2", "TILED=YES"],
-                outputType=gdal_dtype,
-                warpMemoryLimit=memory_limit,
-                resampleAlg="max",
-                cutlineDSName=clip_file,
-                cropToCutline=bool(clip_file),
-            )
-
-            # Perform the warp operation and ensure it completes
-            ds = gdal.Warp(output_path, raster_paths, options=warp_options)
-            if ds is None:
-                raise RuntimeError("Failed to create mosaic")
-
-            # Explicitly flush and close the dataset to ensure data is written
-            ds.FlushCache()
-            ds = None  # Close dataset
-
-            # Verify the output file exists and has valid size
-            if not os.path.exists(output_path):
-                raise RuntimeError(f"Output file was not created: {output_path}")
-            if os.path.getsize(output_path) == 0:
-                raise RuntimeError(f"Output file is empty: {output_path}")
-
-            return output_path
-
+        
+        return output_path
+        
     except Exception as e:
         if os.path.exists(output_path):
             os.remove(output_path)
         raise RuntimeError(f"Error during mosaic processing: {str(e)}")
-
+    
     finally:
         if temp_json and os.path.exists(temp_json):
             os.remove(temp_json)
