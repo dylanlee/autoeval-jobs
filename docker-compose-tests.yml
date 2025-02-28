@@ -1,7 +1,8 @@
 services:
-  mosaic-dev:
+  mosaic-test:
     build: .
-    entrypoint: [ sleep, infinity ]
+    entrypoint: []
+    command: ['python', '-m', 'unittest', 'test.test_mosaic']
     volumes:
       - ./fim_mosaicker:/app
     environment:
@@ -10,9 +11,10 @@ services:
       - AWS_SESSION_TOKEN
       - AWS_DEFAULT_REGION
 
-  inundate-dev:
+  inundate-test:
     build: .
-    entrypoint: [ sleep, infinity ]
+    entrypoint: []
+    command: ['python', '-m', 'unittest', 'test.test_inundate']
     volumes:
       - ./hand_inundator:/app
     environment:
