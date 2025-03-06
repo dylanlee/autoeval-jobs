@@ -1,0 +1,24 @@
+services:
+  mosaic-dev:
+    build: .
+    entrypoint: [ sleep, infinity ]
+    volumes:
+      - ./fim_mosaicker:/app
+    environment:
+      - AWS_ACCESS_KEY_ID
+      - AWS_SECRET_ACCESS_KEY
+      - AWS_SESSION_TOKEN
+    env_file:
+      - .env
+
+  inundate-dev:
+    build: .
+    entrypoint: [ sleep, infinity ]
+    volumes:
+      - ./hand_inundator:/app
+    environment:
+      - AWS_ACCESS_KEY_ID
+      - AWS_SECRET_ACCESS_KEY
+      - AWS_SESSION_TOKEN
+    env_file:
+      - .env
