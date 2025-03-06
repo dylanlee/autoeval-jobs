@@ -1,0 +1,24 @@
+services:
+  mosaic-test:
+    build: .
+    command: ['python', '-m', 'unittest', 'test.test_mosaic']
+    volumes:
+      - ./fim_mosaicker:/app
+    environment:
+      - AWS_ACCESS_KEY_ID
+      - AWS_SECRET_ACCESS_KEY
+      - AWS_SESSION_TOKEN
+    env_file:
+      - .env
+
+  inundate-test:
+    build: .
+    command: ['python', '-m', 'unittest', 'test.test_inundate']
+    volumes:
+      - ./hand_inundator:/app
+    environment:
+      - AWS_ACCESS_KEY_ID
+      - AWS_SECRET_ACCESS_KEY
+      - AWS_SESSION_TOKEN
+    env_file:
+      - .env
