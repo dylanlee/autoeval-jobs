@@ -4,13 +4,13 @@
 
 # About
 
-This repository contains code and tests for a set of containerized flood inundation map (FIM) evaluation jobs that are meant to be composed together to form a FIM evaluation workflow. Each job can be developed and run independently of other jobs or used in conjection with a job orchastrator to run evaluations at scale. The intended target for the orchestrator is HashiCorp Nomad and the jobs have been designed to make them easy to run as parameterized jobs on a Nomad cluster.  
+This repository contains code and tests for a set of containerized flood inundation map (FIM) evaluation jobs that are meant to be composed together to form a FIM evaluation workflow. Each job can be developed and run independently of other jobs or used in conjunction with a job orchestrator to run evaluations at scale. The intended target for the orchestrator is HashiCorp Nomad and the jobs have been designed to make them easy to run as parameterized jobs on a Nomad cluster.  
 
-A more thorough description of the inputs and outputs of each job as well as the intended behavior of a job can be found in the jobs' [interfaces](/interfaces/interfaces.md) descriptions. A job interface is a formal specification of a job's inputs, outputs, and arguments specified using [json-schema](https://json-schema.org/). At the moment the interfaces yaml files serve as a guide for developers when (re)implementing jobs and for understanding the possible ways that jobs can interact through their inputs and outputs. In the future they could also be used to validate the data produced by each job.
+A more thorough description of the inputs and outputs of each job as well as the intended behavior of a job can be found in the jobs' [interfaces](/interfaces/interfaces.md) descriptions. A job interface is a formal specification of a job's inputs, outputs, and arguments specified using [json-schema](https://json-schema.org/). At the moment the interface yaml files serve as a guide for developers when (re)implementing jobs and for understanding the possible ways that jobs can interact through their inputs and outputs. In the future they could also be used to validate the data produced by each job.
 
 # Setup
 
-The jobs are currenly all designed to be run using the same Docker image. We provide a Dockerfile for this image as well as two Docker compose files. The first Docker compose file contains services for running the jobs in an interactive shell for development and debugging. The second Docker compose file specifies services that run a jobs test suite on startup.  
+The jobs are currently all designed to be run using the same Docker image. We provide a Dockerfile for this image as well as two Docker compose files. The first Docker compose file contains services for running the jobs in an interactive shell for development and debugging. The second Docker compose file specifies services that run a jobs test suite on startup.  
 
 ## Configuring environment
 
@@ -18,8 +18,8 @@ Depending on which job is being run, some configuration of the container's envir
 
 The docker compose services follow the following policy for environment variables:
 
-- variables that need to be dynamically updated (like AWS credentials with a fixed, short expiration date) will be referenced in the "environment" block of the docker compose service definition and will be read from the users local shell environment. Currently we are accessing an S3 bucket that requires credentials. To populate you Docker containers with these credentials you would put your AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_SESSION_TOKEN in your host computer's bash shell's environment.
-- Fixed variables will be referenced from a .env file in a env_file block. An example .env file is located at [example.env](example.env) 
+- variables that need to be dynamically updated (like AWS credentials with a fixed, short expiration date) will be referenced in the "environment" block of the docker compose service definition and will be read from the user's local shell environment. Currently we are accessing an S3 bucket that requires credentials. To populate your Docker containers with these credentials you would put your AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_SESSION_TOKEN in your host computer's bash shell's environment.
+- Fixed variables will be referenced from a .env file in an env_file block. An example .env file is located at [example.env](example.env) 
 
 ## Using Docker Compose dev services to interactively run and debug jobs
 
@@ -56,3 +56,4 @@ The `inundate-test` portion of the command above will change depending on which 
 Each docker service in the tests docker compose file runs tests for a different job.
 
 # License
+
