@@ -27,10 +27,10 @@ By convention when outputs are listed for a job it is assumed that these outputs
       "<catchment_id>": {
         "hydrotable_entries": {
           "<HydroID>": {
-            "stage": [<array_of_stage_values>],
-            "discharge_cms": [<array_of_discharge_values>],
-            "nwm_feature_id": <integer>,
-            "lake_id": <integer>
+            "stage": ["array_of_stage_values"],
+            "discharge_cms": ["array_of_discharge_values"],
+            "nwm_feature_id": "<integer>",
+            "lake_id": "<integer>"
           }
           // More HydroID entries...
         },
@@ -110,17 +110,17 @@ Similarly to the mosaicking job geometry inputs and outputs, polygon geometries 
   - This is an optional json object that is composed of sub-objects that include paths to geopackage of masks to exclude or include in the final produced agreement. The input format is identical to the previous format that was previously used to mask areas over which to evaluate FIM model skill. Each mask geometry can also be buffered by setting a buffer flag to an integer value (with units of meters) in the sub-dictionaries "buffer" key.
 
   ```json
-  mask_dict = {
-      "levees": {
-          "path": levee_path,
-          "buffer": None,
-          "operation": "exclude",
-      },
-      "waterbodies": {
-          "path": water_bod_path,
-          "buffer": None,
-          "operation": "exclude",
-      },
+  {
+    "levees": {
+      "path": "path/to/levee/file",
+      "buffer": null,
+      "operation": "exclude"
+    },
+    "waterbodies": {
+      "path": "path/to/waterbody/file",
+      "buffer": null,
+      "operation": "exclude"
+    }
   }
   ```
   
