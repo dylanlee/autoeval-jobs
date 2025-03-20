@@ -63,8 +63,8 @@ class TestMosaicScript(unittest.TestCase):
             self.script_path,
             *self.raster_paths,
             self.output_path,
-            # "--fim-type",
-            # "extent",
+            "--fim-type",
+            "extent",
         ]
 
         # Print the command being run
@@ -89,18 +89,18 @@ class TestMosaicScript(unittest.TestCase):
         # Verify the output raster properties
         with rasterio.open(self.output_path) as src:
             # Check data type (uint8 for extent)
-            # self.assertEqual(
-            #     src.dtypes[0],
-            #     "uint8",
-            #     f"Expected uint8 data type for extent, got {src.dtypes[0]}",
-            # )
+            self.assertEqual(
+                src.dtypes[0],
+                "uint8",
+                f"Expected uint8 data type for extent, got {src.dtypes[0]}",
+            )
 
             # # Check nodata value (255 for extent)
-            # self.assertEqual(
-            #     src.nodata,
-            #     255,
-            #     f"Expected 255 nodata value for extent, got {src.nodata}",
-            # )
+            self.assertEqual(
+                src.nodata,
+                255,
+                f"Expected 255 nodata value for extent, got {src.nodata}",
+            )
 
             # Check that data exists
             data = src.read(1)
@@ -122,13 +122,6 @@ class TestMosaicScript(unittest.TestCase):
                 np.any(data == 1),
                 "Extent raster doesn't contain any 1 values, but should have corner tiles with 1s",
             )
-
-    @classmethod
-    def tearDownClass(cls):
-        print("Cleaning up...")
-        # Uncomment to clean up the output file after test
-        # if os.path.exists(cls.output_path):
-        #     os.remove(cls.output_path)
 
 
 if __name__ == "__main__":

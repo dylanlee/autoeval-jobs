@@ -16,9 +16,9 @@ def mosaic_rasters(
     output_path: str,
     clip_geometry: Optional[Union[str, dict]] = None,
     fim_type: Literal["depth", "extent"] = "depth",
-    window_size: int = 256,
+    geo_mem_cache: int = 256,  # Control GDAL cache size in MB
 ) -> str:
-    """Raster mosaicking using rasterio with block processing.
+    """Raster mosaicking using rasterio with optimized memory settings.
 
     Parameters
     ----------
@@ -32,8 +32,9 @@ def mosaic_rasters(
         Type of FIM output, either "depth" or "extent".
         For depth: uses float32 dtype and -9999 as nodata.
         For extent: uses uint8 dtype and 255 as nodata, converts all nonzero values to 1.
-    window_size : int, optional
-        Size of the processing window in pixels.
+    geo_mem_cache : int, optional
+        GDAL cache size in megabytes, by default 256 MB.
+        Controls memory usage during raster processing.
 
     Returns
     -------
@@ -47,10 +48,6 @@ def mosaic_rasters(
     RuntimeError
         If unable to open input files or process data.
     """
-
-    if window_size <= 0:
-        raise ValueError("window_size must be positive")
-
     if fim_type not in ["depth", "extent"]:
         raise ValueError("fim_type must be either 'depth' or 'extent'")
 
@@ -65,118 +62,179 @@ def mosaic_rasters(
         nodata = 255
         dtype = "uint8"
 
+    # Enhanced GDAL environment settings for better performance
+    config_options = {
+        "GDAL_CACHEMAX": geo_mem_cache,
+        "VSI_CACHE_SIZE": 1024 * 1024 * min(256, geo_mem_cache),  # VSI cache in bytes
+        "GDAL_DISABLE_READDIR_ON_OPEN": "TRUE",  # Performance boost for S3/cloud storage
+        "CPL_VSIL_CURL_ALLOWED_EXTENSIONS": ".tif,.vrt",  # Limit allowed extensions
+    }
+
     # Open all rasters and get their metadata
     src_files = []
     try:
-        for path in raster_paths:
-            src = rasterio.open(path)
-            src_files.append(src)
+        with rasterio.Env(**config_options):
+            for path in raster_paths:
+                src = rasterio.open(path)
+                src_files.append(src)
 
-        # Check that all rasters have the same CRS
-        crs = src_files[0].crs
-        if not all(src.crs == crs for src in src_files):
-            raise ValueError("All rasters must have the same CRS")
+            # Check that all rasters have the same CRS
+            crs = src_files[0].crs
+            if not all(src.crs == crs for src in src_files):
+                raise ValueError("All rasters must have the same CRS")
 
-        # Get bounds of the mosaic
-        bounds = [src.bounds for src in src_files]
-        left = min(bound.left for bound in bounds)
-        bottom = min(bound.bottom for bound in bounds)
-        right = max(bound.right for bound in bounds)
-        top = max(bound.top for bound in bounds)
+            # Get bounds of the mosaic
+            bounds = [src.bounds for src in src_files]
+            left = min(bound.left for bound in bounds)
+            bottom = min(bound.bottom for bound in bounds)
+            right = max(bound.right for bound in bounds)
+            top = max(bound.top for bound in bounds)
 
-        # Get resolution (assuming all rasters have same resolution)
-        res = src_files[0].res
-        if not all(src.res == res for src in src_files):
-            raise ValueError("All rasters must have the same resolution")
+            # Get resolution (assuming all rasters have same resolution)
+            res = src_files[0].res
+            if not all(src.res == res for src in src_files):
+                raise ValueError("All rasters must have the same resolution")
 
-        # Calculate output dimensions
-        width = int((right - left) / res[0] + 0.5)
-        height = int((top - bottom) / res[1] + 0.5)
+            # Calculate output dimensions
+            width = int((right - left) / res[0] + 0.5)
+            height = int((top - bottom) / res[1] + 0.5)
 
-        # Create output profile
-        profile = src_files[0].profile.copy()
-        profile.update(
-            {
-                "driver": "GTiff",
-                "height": height,
-                "width": width,
-                "transform": rasterio.transform.from_bounds(
-                    left, bottom, right, top, width, height
-                ),
-                "dtype": dtype,
-                "nodata": nodata,
-                "tiled": True,
-                "compress": "lzw",
-                "predictor": 2,
-            }
-        )
+            # Create output profile
+            profile = src_files[0].profile.copy()
+            profile.update(
+                {
+                    "driver": "GTiff",
+                    "height": height,
+                    "width": width,
+                    "transform": rasterio.transform.from_bounds(
+                        left, bottom, right, top, width, height
+                    ),
+                    "dtype": dtype,
+                    "nodata": nodata,
+                    "tiled": True,
+                    "blockxsize": 256,  # Standard block size for efficient processing
+                    "blockysize": 256,
+                    "compress": "lzw",
+                    "predictor": 2,
+                }
+            )
 
-        # Create output raster
-        os.makedirs(os.path.dirname(output_path), exist_ok=True)
-        with rasterio.open(output_path, "w", **profile) as dst:
-            # Process by blocks
-            for y in range(0, height, window_size):
-                y_size = min(window_size, height - y)
-                for x in range(0, width, window_size):
-                    x_size = min(window_size, width - x)
+            # Create output raster
+            os.makedirs(os.path.dirname(output_path), exist_ok=True)
+            with rasterio.open(output_path, "w", **profile) as dst:
+                # Get a list of all blocks for processing
+                windows = list(dst.block_windows(1))
 
-                    window = Window(x, y, x_size, y_size)
+                # Process each window
+                for idx, (_, window) in enumerate(windows):
+                    # Create a transform for this particular window
                     window_transform = dst.window_transform(window)
 
-                    # Initialize output block
-                    out_data = np.full((y_size, x_size), nodata, dtype=profile["dtype"])
+                    # Initialize output block with nodata
+                    out_data = np.full(
+                        (window.height, window.width), nodata, dtype=profile["dtype"]
+                    )
 
-                    # Read and merge data from each source that overlaps this window
+                    # Track if we've found any valid data for this window
+                    has_valid_data = False
+
+                    # Compute the window bounds in coordinate space
+                    window_bounds = rasterio.transform.array_bounds(
+                        window.height, window.width, window_transform
+                    )
+
+                    # For each source raster, check if it overlaps with this window
                     for src in src_files:
-                        # Compute the window bounds in mosaic coordinate space
-                        window_bounds = rasterio.transform.array_bounds(
-                            y_size, x_size, window_transform
-                        )
-
-                        # Compute the corresponding window in the source raster
+                        # Calculate the window in the source raster's coordinate system
                         src_window = src.window(*window_bounds)
 
-                        # Check if source overlaps with window
+                        # Check if the source overlaps this window
                         if src_window.width <= 0 or src_window.height <= 0:
                             continue
 
-                        # Read data from the source raster within src_window
-                        data = src.read(1, window=src_window)
-                        if data is None or data.size == 0:
+                        # Read data from the source raster
+                        try:
+                            # Ensure the window is valid for reading
+                            src_window = src_window.round_offsets().round_lengths()
+                            data = src.read(
+                                1,
+                                window=src_window,
+                                boundless=True,
+                                fill_value=src.nodata,
+                            )
+
+                            if data is None or data.size == 0:
+                                continue
+
+                            # Create mask of valid data (not nodata)
+                            src_nodata = src.nodata if src.nodata is not None else None
+                            valid_mask = (
+                                np.ones_like(data, dtype=bool)
+                                if src_nodata is None
+                                else data != src_nodata
+                            )
+
+                            if fim_type == "extent":
+                                # For extent type, convert all non-zero values to 1
+                                # But only for valid (not nodata) cells
+                                data_temp = np.zeros_like(data, dtype=np.uint8)
+                                # Set 1 where valid and non-zero
+                                data_temp[valid_mask & (data != 0)] = 1
+                                data = data_temp
+
+                            # Update the output array - only where valid data exists
+                            if np.any(valid_mask):
+                                has_valid_data = True
+                                # Only keep maximum values where mask is True
+                                temp = np.full_like(data, nodata)
+                                temp[valid_mask] = data[valid_mask]
+
+                                # Create a mask for where out_data is nodata
+                                out_nodata_mask = out_data == nodata
+
+                                # Where both are valid, take max. Where only temp is valid, take temp.
+                                # Where only out_data is valid, keep out_data
+                                mask_both_valid = valid_mask & ~out_nodata_mask
+                                mask_only_temp_valid = valid_mask & out_nodata_mask
+
+                                if np.any(mask_both_valid):
+                                    out_data[mask_both_valid] = np.maximum(
+                                        out_data[mask_both_valid], temp[mask_both_valid]
+                                    )
+                                if np.any(mask_only_temp_valid):
+                                    out_data[mask_only_temp_valid] = temp[
+                                        mask_only_temp_valid
+                                    ]
+
+                        except Exception as e:
+                            print(f"Warning: Error reading window from source: {e}")
                             continue
 
-                        # For extent type, convert nonzero values to 1
-                        if fim_type == "extent":
-                            data = (data != 0).astype(np.uint8)
+                    # For extent type, ensure we only have 0, 1, or nodata in the output
+                    if fim_type == "extent" and has_valid_data:
+                        valid_mask = out_data != nodata
+                        out_data[valid_mask & (out_data > 0)] = 1
 
-                        # Update output with maximum values
-                        valid_mask = (
-                            data != src.nodata
-                            if src.nodata is not None
-                            else np.ones_like(data, dtype=bool)
-                        )
-                        np.maximum(
-                            out_data, np.where(valid_mask, data, nodata), out=out_data
-                        )
-
-                    # Write block
+                    # Write block to output
                     dst.write(out_data, window=window, indexes=1)
 
-        # Apply clipping if geometry provided
-        if clip_geometry is not None:
-            with rasterio.open(output_path, "r+") as src:
-                if isinstance(clip_geometry, str):
-                    with fiona.open(clip_geometry, "r") as clip_file:
-                        geoms = [feature["geometry"] for feature in clip_file]
-                else:
-                    geoms = (
-                        [clip_geometry]
-                        if isinstance(clip_geometry, dict)
-                        else clip_geometry
-                    )
+            # Apply clipping if geometry provided
+            if clip_geometry is not None:
+                with rasterio.open(output_path, "r+") as src:
+                    if isinstance(clip_geometry, str):
+                        with fiona.open(clip_geometry, "r") as clip_file:
+                            geoms = [feature["geometry"] for feature in clip_file]
+                    else:
+                        geoms = (
+                            [clip_geometry]
+                            if isinstance(clip_geometry, dict)
+                            else clip_geometry
+                        )
 
-                out_data, out_transform = mask(src, geoms, crop=False, nodata=nodata)
-                src.write(out_data[0], indexes=1)
+                    out_data, out_transform = mask(
+                        src, geoms, crop=False, nodata=nodata
+                    )
+                    src.write(out_data[0], indexes=1)
 
     finally:
         # Close all source files
@@ -188,26 +246,7 @@ def mosaic_rasters(
 
 if __name__ == "__main__":
     """
-    Entry point to the mosaic_rasters function that mosaics a list of FIM extents or depths together. Will also add capability to handle vector geometries in the near future.
-
-    Command-line Arguments
-    ---------------------
-    raster_paths : list of paths
-        One or more paths to the input rasters to be mosaicked.
-    output_path : path
-        Path where the mosaicked output will be saved.
-    --clip-geometry : path, optional
-        Path to vector file for clipping the output raster.
-    --fim-type : str, optional
-        Type of FIM output, either "depth" or "extent".
-        Default is "depth".
-    --window-size : int, optional
-        Size of the processing window in pixels.
-        Default is 256.
-
-    Usage example
-    ------
-    python3 /app/fim_mosaicker/mosaic.py /app/test/mock_data/raster1.tif /app/test/mock_data/raster2.tif /app/test/mock_data/raster3.tif /app/test/mock_data/raster4.tif /app/test/mock_data/mosaicked_raster.tif
+    Entry point to the mosaic_rasters function that mosaics a list of FIM extents or depths together.
     """
 
     parser = argparse.ArgumentParser(
@@ -240,10 +279,10 @@ if __name__ == "__main__":
     )
 
     parser.add_argument(
-        "--window-size",
+        "--geo-mem-cache",
         type=int,
         default=256,
-        help="Size of the processing window in pixels",
+        help="GDAL cache size in megabytes",
     )
 
     args = parser.parse_args()
@@ -255,7 +294,7 @@ if __name__ == "__main__":
             output_path=str(args.output_path),
             clip_geometry=str(args.clip_geometry) if args.clip_geometry else None,
             fim_type=args.fim_type,
-            window_size=args.window_size,
+            geo_mem_cache=args.geo_mem_cache,
         )
         print(f"Successfully created mosaic: {output_raster}")
 

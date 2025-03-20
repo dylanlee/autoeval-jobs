@@ -3,7 +3,7 @@ description: Mosaics and homogenizes overlapping flood observations (raster or v
 outputTransmission:
   - reference
 arguments:
-  targetResolution:
+  target_res:
     title: Target Resolution
     description: Resolution in CRS units (required for raster outputs)
     schema:
@@ -18,6 +18,21 @@ arguments:
           minimum: 0
           exclusiveMinimum: true
       required: [x, y]
+  fim_type:
+    title: FIM Type
+    description: Type of flood inundation map output
+    schema:
+      type: string
+      enum: [depth, extent]
+      default: depth
+  geo_mem_cache:
+    title: Geocomputing Memory Cache
+    description: GDAL cache size in megabytes for optimized raster processing
+    schema:
+      type: integer
+      minimum: 64
+      maximum: 4096
+      default: 256
 inputs:
   inputFiles:
     title: Input Datasets
@@ -62,6 +77,11 @@ outputs:
               const: EPSG:5070
               description: Standard US analysis projection with equal area preservation
             units: meters
+            properties:
+              fimType:
+                type: string
+                enum: [depth, extent]
+                description: Type of FIM output - depth (float32) or extent (uint8)
         - type: string
           format: uri
           contentMediaType: application/geopackage+gpkg

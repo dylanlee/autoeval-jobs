@@ -4,31 +4,18 @@ This interface directory contains a set of yaml files that specifies interfaces 
 
 Below we give a human readable description of the contents of each yaml file. The descriptions also expand on the anticipated behavior of the jobs for common input and argument combinations. 
 
-## Coordinator (`coordinator`)  
-### Description  
-The coordinator is the entry point to the evaluation pipeline. It takes a gpkg containing either a polygon or multipolygon geometry and then uses that to run and monitor batch jobs for each step along the evaluation pipeline for all the polygons submitted by the user. 
-
-The current evaluation pipeline is primarily designed to generate HAND FIM extents or depths and then evaluate these against relevant benchmark sources.
-
-### Arguments
-- **HAND Version** 
-  - The HAND version argument allows the user to specify a specific version of HAND to generate extents for. This argument is required.
-- **Benchmark Source** 
-  - This is a string that select which source will be used to evaluate HAND against. For example 'ripple-mip' will be used to select FEMA MIP data produced by ripple. This argument is required.
-- **Date Range** 
-  - Certain Benchmark sources contain flood scenarios that have a time component to them. For example high water mark data is associated with the flood  event associated with a given survey. This argument allows for filtering a Benchmark source to only return benchmark data within a certain date range.
- 
-### Inputs
-- **AOI**
-  - This input is a geopackage that must contain either a polygon or multipolygon geometry. For every polygon the coordinator will generate a HAND extent and find benchmark data that lies within the polygon for the source selected by the user. The coordinator will then run all the rest of the jobs described in this repository to generate an evaluation for that polygon. 
+By convention when outputs are listed for a job it is assumed that these outputs will always be written to a filepath(s) that is specified when a job is called. This is to make it easier to integrate the jobs with a batch orchestrator. std-out is reserved for job logging rather than output. 
 
 ## HAND Inundator (`hand_inundator`)
+
+**Implementation status:  partially implemented. Depth FIM production will be added in PI-6**
+
 ### Description  
 - Generates flood extent/depth maps from a HAND REM. This job inundates a *single* hand catchment. It can be configured to return either a depth FIM or an extent FIM.
 
 ### Arguments  
-- **window_size**
-  - Tile processing size (256-4096px). Rasters are processed by tile to limit memory usage. 
+- **geo_mem_cache**
+  - The GDAL cache size in megabytes to use when processing gridded data. Raster processing is the most memory intensive portion of this job so this argument effectively limits the memory used by the job.
 - **output_type**
   - Extent (binary) vs Depth (float values)  
 
@@ -68,6 +55,9 @@ The current evaluation pipeline is primarily designed to generate HAND FIM exten
 ---
 
 ## Mosaic Maker (`fim_mosaicker`) 
+
+**Implementation status:  partially implemented. Vector mosaicking and mosaicking for depth rasters will be added in PI-6**
+
 ### Description  
 This job mosaics flood extents and benchmark raster data from either HAND or benchmark sources using a pixel-wise NAN-MAX selection policy. That is, for all the images being mosaicked if there are overlapping raster pixels then the maximum value of the overlapping rasters at that pixel location is selected. No-Data values are not considered when selecting the maximum (they are treated as Nan) unless all the pixels are No-Data. Rasters can be either depth or extent rasters and the mosaicking policy for overlapping rasters will remain the same. Common input combinations and the behavior of the jobs in those cases are described below.
 
@@ -78,13 +68,17 @@ In the case of a polygon or multipolygon geometries they will be treated as only
 In the case of point or multipoint geometries they can contain either extents or depths in their attributes and will pass through the type of information they are tagged with unless they are being mosaicked with polygon geometries. When a raster is being mosaicked with point geometries, locations where the raster coincide with the point values will be converted to a point geometry by averaging extent or depth pixel values within a buffer of the point location. This value will then be mosaicked with the value described by the overlapping point geometries depth or extent attribute. The raster values that don't coincide with points in the point geometry will be discarded. Additional attributes from the original point geometries will be passed through and returned with the mosaicked geometries.
 
 ### Arguments
-- **Target Resolution**
-  - Required for raster outputs  
+- **target_resolution**
+  - Resolution of the final mosaicked FIM when a raster will be produced. Required for raster outputs  
+- **fim_type**
+  - This informs the job whether it is mosaicking FIMs with extents or depths.
+- **geo_mem_cache**
+  - The GDAL cache size in megabytes to use when processing gridded data. Raster processing is the most memory intensive portion of this job so this argument effectively limits the memory used by the job.
 
 ### Inputs
 - **Files**: 
   - Array of paths to TIFF/GeoJSON/GeoPackage rasters and/or vector files. If a vector is listed in the array then the output will be a vector. 
-- **Clipping**
+- **Clipping Geometry**
   - Optional GeoJSON boundary to clip the mosaicked output to. This input will always be given in the HAND FIM evaluation pipeline and will describe the ROI being evaluated.
 
 ### Outputs 
@@ -96,6 +90,9 @@ In the case of point or multipoint geometries they can contain either extents or
 ---
 
 ## Agreement Maker (`agreement_maker`) 
+
+**Implementation status:  Will be implemented in NGWPC PI-6**
+
 ### Description  
 Creates an agreement map showing where a pair of input data (raster or vector) spatially concur. The job is designed to work with any combination of raster or vector input pairs. The job also works with depth or extent data with the assumption that a given pair will be either both depths or extents. Produces either a continuous  agreement map when the inputs are depths or a categorical agreement map for extents. The output is raster or vector data in EPSG:5070.
 
@@ -138,6 +135,9 @@ Output is either a single raster or a geopackage of vector information.
 ---
 
 ## Metrics Calculator (`metrics_calculator`) 
+
+**Implementation status:  Will be implemented in NGWPC PI-6**
+
 ### Description  
 This job is designed to take an agreement map and calculate summary metrics of the agreement of two FIMs over a given ROI.
 

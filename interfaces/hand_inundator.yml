@@ -3,14 +3,14 @@ description: Generates flood inundation extents using HAND methodology and NWM f
 outputTransmission:
   - reference
 arguments:
-  window_size:
-    title: Processing Window Size
-    description: Tile dimensions for raster processing (pixels)
+  geo_mem_cache:
+    title: Geocomputing Memory Cache
+    description: GDAL cache size in megabytes for optimized raster processing
     schema:
       type: integer
-      minimum: 256
-      maximum: 4096
-      default: 1024
+      minimum: 64
+      maximum: 8192
+      default: 512
   output_type:
     title: Output Data Type
     description: Choose between depth values or binary inundation extent
@@ -21,7 +21,7 @@ arguments:
 inputs:
   catchment:
     title: Catchment Metadata
-    description: JSON file containing catchment HydroID rating curves, metadata, and paths the raster data required to inundate the catchment
+    description: JSON file containing catchment HydroID rating curves, metadata, and paths to the raster data required to inundate the catchment
     schema:
       type: object
       properties:

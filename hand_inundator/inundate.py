@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 import os
+import shutil
+import pdb
 import json
 import argparse
 from smart_open import open
@@ -15,7 +17,7 @@ def inundate(
     catchment_data: Union[str, Dict[str, Any]],
     forecast_path: str,
     output_path: str,
-    window_size: int = 1024,
+    geo_mem_cache: int = 512,  # Control GDAL cache size in MB
 ) -> str:
     """
     Generate inundation map from NWM forecasts and HAND data.
@@ -28,8 +30,9 @@ def inundate(
         Path to forecast CSV file.
     output_path : str
         Output path for inundation raster.
-    window_size : int, optional
-        Processing window size in pixels, by default 1024.
+    geo_mem_cache : int, optional
+        GDAL cache size in megabytes, by default 256 MB.
+        Controls memory usage during raster processing.
 
     Returns
     -------
@@ -55,19 +58,24 @@ def inundate(
             }
         )
 
-    # Load data
+    # Load data efficiently
     if isinstance(catchment_data, str):
         with open(catchment_data) as f:
             catchment = json.load(f)
     else:
         catchment = catchment_data
 
+    # Use optimized CSV reading with just the columns we need
     with open(forecast_path, "r") as f:
         forecast = pd.read_csv(
             f,
+            usecols=[0, 1],  # Only read the first two columns
             header=0,
             names=["feature_id", "discharge"],
-            dtype={"feature_id": int, "discharge": float},
+            dtype={
+                "feature_id": np.int32,
+                "discharge": np.float32,
+            },  # Specify exact dtypes
         )
 
     # Create stage mapping with proper group handling
@@ -75,12 +83,14 @@ def inundate(
         names="HydroID"
     )
     hydro_df = hydro_df[hydro_df.lake_id == -999].explode(["stage", "discharge_cms"])
+
+    # Optimize data types for memory efficiency
     hydro_df = hydro_df.astype(
         {
-            "HydroID": "int32",
-            "stage": "float32",
-            "discharge_cms": "float32",
-            "nwm_feature_id": "int32",
+            "HydroID": np.int32,
+            "stage": np.float32,
+            "discharge_cms": np.float32,
+            "nwm_feature_id": np.int32,
         }
     )
 
@@ -89,6 +99,10 @@ def inundate(
         forecast, left_on="nwm_feature_id", right_on="feature_id", how="inner"
     )
 
+    if merged.empty:
+        raise ValueError("No matching forecast data for catchment features")
+
+    # More efficient stage interpolation
     merged.set_index("HydroID", inplace=True)
 
     stage_map = (
@@ -97,46 +111,91 @@ def inundate(
         .to_dict()
     )
 
-    if merged.empty:
-        raise ValueError("No matching forecast data for catchment features")
-
     # Create temporary output path
     temp_output = "/tmp/temp_inundation.tif"
 
-    # Windowed raster processing
-    with rasterio.open(
-        catchment["raster_pair"]["rem_raster_path"]
-    ) as rem, rasterio.open(catchment["raster_pair"]["catchment_raster_path"]) as cat:
+    # Enhanced GDAL environment settings for better performance
+    config_options = {
+        "GDAL_CACHEMAX": geo_mem_cache,
+        "VSI_CACHE_SIZE": 1024
+        * 1024
+        * min(256, geo_mem_cache),  # VSI cache in bytes (smaller than GDAL cache)
+        "GDAL_DISABLE_READDIR_ON_OPEN": "TRUE",  # Performance boost for S3/cloud storage
+        "CPL_VSIL_CURL_ALLOWED_EXTENSIONS": ".tif,.vrt",  # Limit allowed extensions for security
+    }
 
-        profile = rem.profile
-        profile.update(dtype="uint8", count=1, nodata=255, compress="lzw")
+    # Set up rasterio environment with optimized settings
+    with rasterio.Env(**config_options):
+        # Windowed raster processing using rasterio's built-in blocking
+        rem_path = catchment["raster_pair"]["rem_raster_path"]
+        cat_path = catchment["raster_pair"]["catchment_raster_path"]
 
-        with rasterio.open(temp_output, "w", **profile) as dst:
-            for y in range(0, rem.height, window_size):
-                h = min(window_size, rem.height - y)
-                for x in range(0, rem.width, window_size):
-                    w = min(window_size, rem.width - x)
-                    window = Window(x, y, w, h)
+        with rasterio.open(rem_path) as rem, rasterio.open(cat_path) as cat:
+            profile = rem.profile
+            profile.update(
+                dtype="uint8",
+                count=1,
+                nodata=255,
+                compress="lzw",
+                tiled=True,  # Ensure output is tiled for efficient access
+                blockxsize=256,  # Reasonable block size for most systems
+                blockysize=256,
+            )
 
-                    rem_win = rem.read(1, window=window)
-                    cat_win = cat.read(1, window=window).astype("int32")
+            with rasterio.open(temp_output, "w", **profile) as dst:
+                windows = list(rem.block_windows(1))
 
+                # Process each window
+                for _, window in windows:
+                    # Read data with exact dtypes to avoid unnecessary conversions
+                    rem_win = rem.read(1, window=window, out_dtype=np.float32)
+                    cat_win = cat.read(1, window=window, out_dtype=np.int32)
+
+                    # Create output array directly with required dtype
+                    inundation = np.zeros(rem_win.shape, dtype=np.uint8)
+
+                    # Process only where rem_win is valid to save computation
                     valid_mask = rem_win >= 0
-                    stages = np.vectorize(lambda x: stage_map.get(x, -9999))(cat_win)
-                    inundation = (
-                        (stages > rem_win) & valid_mask & (stages != -9999)
-                    ).astype("uint8")
 
+                    if np.any(valid_mask):
+                        # Use a approach that avoids vectorize which is slow
+                        unique_ids = np.unique(cat_win[valid_mask])
+                        for uid in unique_ids:
+                            if uid in stage_map:
+                                stage_value = stage_map[uid]
+                                # Apply inundation logic for this specific catchment ID
+                                id_mask = (cat_win == uid) & valid_mask
+                                # Create a temporary mask of the same shape as id_mask
+                                temp_mask = np.zeros_like(id_mask, dtype=bool)
+                                # Only set True values where the condition is met for the current ID
+                                temp_mask[id_mask] = rem_win[id_mask] <= stage_value
+                                # Update inundation based on the combined mask
+                                inundation[temp_mask] = 1
+                    # Write the results
                     dst.write(inundation, 1, window=window)
 
     # Handle output path
     if output_path.startswith("s3://"):
         s3_path = output_path[5:]
         bucket, _, key = s3_path.partition("/")
-        boto3.client("s3").upload_file(temp_output, bucket, key)
+
+        # Configure S3 client for better transfer performance
+        s3_client = boto3.client(
+            "s3",
+            config=boto3.config.Config(
+                max_pool_connections=4, retries={"max_attempts": 3}
+            ),
+        )
+
+        s3_client.upload_file(
+            temp_output,
+            bucket,
+            key,
+            ExtraArgs={"StorageClass": "STANDARD"},  # Can be adjusted based on needs
+        )
     else:
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
-        os.replace(temp_output, output_path)
+        shutil.move(temp_output, output_path)
 
     return output_path
 
@@ -154,16 +213,15 @@ def main():
         "--output-path", required=True, help="Output path for inundation raster"
     )
     parser.add_argument(
-        "--window-size", type=int, default=1024, help="Processing window size in pixels"
+        "--geo-mem-cache", type=int, default=512, help="GDAL cache size in megabytes"
     )
     args = parser.parse_args()
-
     try:
         output_raster = inundate(
             catchment_data=args.catchment_data,
             forecast_path=args.forecast_path,
             output_path=args.output_path,
-            window_size=args.window_size,
+            geo_mem_cache=args.geo_mem_cache,
         )
         print(f"Successfully created inundation raster: {output_raster}")
     except Exception as e:
