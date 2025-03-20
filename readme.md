@@ -1,6 +1,6 @@
 # Disclaimer 
 
-**Note: this repository is a work in progress. The code is being actively developed and the intended functionality is only partially implemented.**
+**Note: this repository is a work in progress. The code is being actively developed and the intended functionality is only partially implemented. These capabilities are scheduled for delivery to OWP in PI-7.**
 
 # About
 
